@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Install, lint, typecheck, test, build, e2e, smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Same install as the documented setup: lockfile install, then the browser build.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test -- --run
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      # The production server starts exactly as documented and must answer 2xx.
+      - name: Production smoke test
+        run: |
+          set -euo pipefail
+          npm start &
+          server_pid=$!
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4173/api/health > /dev/null; then
+              echo "GET /api/health answered 2xx after ${attempt} attempt(s)."
+              kill "$server_pid" 2>/dev/null || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Production server did not answer 2xx on http://127.0.0.1:4173/api/health" >&2
+          kill "$server_pid" 2>/dev/null || true
+          exit 1
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

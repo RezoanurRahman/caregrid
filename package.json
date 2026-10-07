@@ -1,0 +1,57 @@
+{
+  "name": "caregrid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first coordination desk for pop-up community health clinics.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch src/server/server.ts",
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true });\"",
+    "build": "npm run clean && npm run build:server && npm run build:client",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:client": "vite build",
+    "start": "node dist/server/server.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "test": "vitest run --dir tests/unit --passWithNoTests",
+    "test:watch": "vitest --dir tests/unit",
+    "test:integration": "vitest run --dir tests/integration --passWithNoTests",
+    "test:e2e": "cross-env CAREGRID_TODAY=2026-10-07 playwright test",
+    "db:reset": "node --input-type=module -e \"import { rmSync } from 'node:fs'; const file = process.env.CAREGRID_DB_FILE ?? 'data/caregrid.sqlite'; for (const suffix of ['', '-wal', '-shm']) rmSync(file + suffix, { force: true });\""
+  },
+  "dependencies": {
+    "@fastify/static": "^10.1.5",
+    "better-sqlite3": "^12.11.1",
+    "fastify": "^5.12.5",
+    "lit": "^3.3.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.20.5",
+    "concurrently": "^9.2.4",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vite": "^7.3.7",
+    "vitest": "^3.2.7"
+  }
+}
