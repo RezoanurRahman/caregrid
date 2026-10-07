@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FOLLOW_UP_PRIORITIES } from '../../shared/constants.js';
 import {
   emptyAppointmentForm,
   emptyClientForm,
@@ -181,6 +182,46 @@ describe('appointment validation', () => {
 });
 
 describe('follow-up validation', () => {
+  it('starts a new follow-up with the API priority normal', () => {
+    const form = emptyFollowUpForm('2026-10-09');
+    expect(form.priority).toBe('normal');
+    expect(FOLLOW_UP_PRIORITIES).toContain(form.priority);
+    expect(validateFollowUpForm(form).errors.priority).toBeUndefined();
+  });
+
+  it('accepts every API priority and rejects the local display alias', () => {
+    for (const priority of FOLLOW_UP_PRIORITIES) {
+      const result = validateFollowUpForm({
+        ...emptyFollowUpForm('2026-10-09'),
+        clientId: 'cli-1',
+        title: 'Call back',
+        priority,
+      });
+      expect(result.errors.priority).toBeUndefined();
+      expect(result.valid).toBe(true);
+    }
+
+    const alias = validateFollowUpForm({
+      ...emptyFollowUpForm('2026-10-09'),
+      clientId: 'cli-1',
+      title: 'Call back',
+      priority: 'medium',
+    });
+    expect(alias.valid).toBe(false);
+    expect(alias.errors.priority).toBe('Choose a priority of low, normal or high.');
+  });
+
+  it('requires an explicit priority when the field is cleared', () => {
+    const result = validateFollowUpForm({
+      ...emptyFollowUpForm('2026-10-09'),
+      clientId: 'cli-1',
+      title: 'Call back',
+      priority: '   ',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.priority).toBe('Choose a priority.');
+  });
+
   it('accepts a linked follow-up', () => {
     const result = validateFollowUpForm({
       ...emptyFollowUpForm('2026-10-09'),

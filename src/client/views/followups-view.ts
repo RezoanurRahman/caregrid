@@ -41,9 +41,13 @@ import type {
   LoadState,
 } from '../types.js';
 
+/**
+ * Option values are the API vocabulary (`low | normal | high`); the queue badge shows `normal` as
+ * "Medium priority" through `normalizePriority`.
+ */
 const PRIORITY_OPTIONS = [
   { value: 'high', label: 'High priority' },
-  { value: 'medium', label: 'Medium priority' },
+  { value: 'normal', label: 'Normal priority' },
   { value: 'low', label: 'Low priority' },
 ];
 
@@ -491,7 +495,18 @@ export class CaregridFollowUpsView extends CaregridView {
                 .value=${this.form.priority}
                 @change=${(event: Event) => this.updateForm('priority', (event.target as HTMLSelectElement).value)}
               >
-                ${PRIORITY_OPTIONS.map((option) => html`<option value=${option.value}>${option.label}</option>`)}
+                ${PRIORITY_OPTIONS.map(
+                  // Lit commits the select's `.value` before these nested option templates
+                  // exist, so bind `selected` too or the browser falls back to the first option
+                  // while the form state says otherwise.
+                  (option) =>
+                    html`<option
+                      value=${option.value}
+                      .selected=${option.value === this.form.priority}
+                    >
+                      ${option.label}
+                    </option>`,
+                )}
               </select>
             </p>
             <p class="field">

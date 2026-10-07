@@ -7,7 +7,7 @@
  * a browser.
  */
 
-import { MAX_PHONE_LENGTH } from '../../shared/constants.js';
+import { FOLLOW_UP_PRIORITIES, MAX_PHONE_LENGTH } from '../../shared/constants.js';
 import { todayDateOnly } from './format.js';
 
 export type FieldErrors = Record<string, string>;
@@ -78,12 +78,16 @@ export function emptyAppointmentForm(date: string = todayDateOnly()): Appointmen
   };
 }
 
+/**
+ * A fresh form uses the API priority vocabulary (`low | normal | high`), not the client display
+ * alias `medium`: `normalizePriority` maps API `normal` onto the queue's "Medium priority" badge.
+ */
 export function emptyFollowUpForm(dueDate: string = todayDateOnly()): FollowUpFormValues {
   return {
     clientId: '',
     appointmentId: '',
     title: '',
-    priority: 'medium',
+    priority: 'normal',
     dueDate,
     assignee: '',
     detail: '',
@@ -167,6 +171,8 @@ export function validateFollowUpForm(values: FollowUpFormValues): ValidationResu
   }
   if (values.priority.trim() === '') {
     errors.priority = 'Choose a priority.';
+  } else if (!(FOLLOW_UP_PRIORITIES as readonly string[]).includes(values.priority.trim())) {
+    errors.priority = 'Choose a priority of low, normal or high.';
   }
   maxLength(values.detail, 400, 'Notes', errors, 'detail');
   return { valid: Object.keys(errors).length === 0, errors };
