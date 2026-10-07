@@ -87,6 +87,12 @@ export interface Client {
   phone: string;
   /** `null` means "no email on file". */
   email: string | null;
+  /**
+   * Channel the clinic should use to reach this client. `POST /api/clients`
+   * accepts `phone`, `sms`, `email`, `letter` or `in_person`; reads default to
+   * `phone` when the stored value is missing.
+   */
+  preferredContact?: string;
   accessNotes: string;
   consentStatus: ClientConsentStatus;
   /** `waitlist` is a first-class public status alongside active and archived. */

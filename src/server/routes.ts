@@ -6,8 +6,8 @@
  * JSON contract (`firstName`/`lastName`, `opensAt`/`closesAt`, `type`). The
  * mappers in this file translate between the two in one place, and
  * `api_record_extras` persists the handful of contract fields the store schema
- * does not model yet (client consent/preferred name, appointment type,
- * follow-up priority) so a write and the following read agree.
+ * does not model yet (client consent/preferred name/contact preference,
+ * appointment type, follow-up priority) so a write and the following read agree.
  *
  * Every request body and query string is parsed with the shared Zod schemas,
  * every storage error keeps its domain code (`NOT_FOUND` -> 404, `CONFLICT` /
@@ -80,6 +80,13 @@ const UNKNOWN_DATE_OF_BIRTH = '1900-01-01';
 
 /** Visible placeholder for a client that has no phone number on file. */
 const UNKNOWN_PHONE = 'not provided';
+
+/**
+ * Contact channels accepted by `POST /api/clients` and persisted in the client
+ * record's extras. Kept local so the stored value stays a closed set without
+ * widening the shared contract.
+ */
+const PREFERRED_CONTACTS = ['phone', 'sms', 'email', 'letter', 'in_person'] as const;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -265,6 +272,7 @@ interface ClientView {
   preferredName: string;
   phone: string;
   email: string | null;
+  preferredContact: string;
   accessNotes: string;
   consentStatus: ClientConsentStatus;
   status: ClientStatus | 'waitlist';
@@ -433,6 +441,12 @@ function followUpPriorityValue(value: string): FollowUpPriority {
   return match ?? 'normal';
 }
 
+/** Unknown or missing stored values fall back to the clinic's phone default. */
+function preferredContactValue(value: string): string {
+  const match = PREFERRED_CONTACTS.find((candidate) => candidate === value);
+  return match ?? 'phone';
+}
+
 function mapClient(raw: unknown, extras: Json = {}): ClientView {
   const record = asRecord(raw);
   const names = splitFullName(str(record, 'fullName', 'name'));
@@ -445,6 +459,7 @@ function mapClient(raw: unknown, extras: Json = {}): ClientView {
     preferredName: str(record, 'preferredName') || str(extras, 'preferredName'),
     phone: str(record, 'phone'),
     email: email === null || email.trim() === '' ? null : email,
+    preferredContact: preferredContactValue(str(extras, 'preferredContact')),
     accessNotes: str(record, 'accessNotes', 'notes'),
     consentStatus: consentValue(str(record, 'consentStatus') || str(extras, 'consentStatus')),
     status: clientStatusValue(str(record, 'status')),
@@ -592,6 +607,7 @@ const clientCreateSchema = z.object({
   lastName: z.string().trim().min(1, 'Last name is required').max(MAX_NAME_LENGTH).optional(),
   fullName: optionalTextField('Full name', MAX_NAME_LENGTH),
   preferredName: optionalTextField('Preferred name', MAX_NAME_LENGTH),
+  preferredContact: z.enum(PREFERRED_CONTACTS).optional(),
   phone: phoneSchema,
   email: z.union([emailSchema, z.literal('')]).optional(),
   dateOfBirth: isoDateSchema.optional(),
@@ -847,6 +863,7 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
       ...(consent === undefined ? {} : { consentStatus: consent }),
       ...(body.preferredName === undefined ? {} : { preferredName: body.preferredName }),
       ...(body.dateOfBirth === undefined ? {} : { dateOfBirth: body.dateOfBirth }),
+      preferredContact: body.preferredContact ?? 'phone',
     });
     reply.code(201).header('location', `/api/clients/${id}`);
     return reply.send(mapClient(created, extras.get('client', id)));
