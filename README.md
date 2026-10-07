@@ -174,7 +174,7 @@ than opening a port.
 | GET        | `/api/providers`               | Provider directory (read-only)                                                                              |
 | GET        | `/api/sessions`                | Clinic sessions (read-only), filtered by `date` or `from`/`to`                                              |
 | GET        | `/api/clients`                 | Client roster; filters `search` (alias `q`) and `status`                                                    |
-| POST       | `/api/clients`                 | Register a client                                                                                           |
+| POST       | `/api/clients`                 | Register a client; `preferredContact` is `phone`\|`sms`\|`email`\|`letter`\|`in_person`, default `phone`    |
 | GET        | `/api/clients/:id`             | Client detail with appointments, follow-ups and the activity trail                                          |
 | GET        | `/api/appointments`            | Appointments filtered by `date`, `from`, `to`, `status`, `type`, `clientId`, `providerId`, `sessionId`, `q` |
 | POST       | `/api/appointments`            | Create a conflict- and capacity-checked appointment                                                         |
@@ -201,7 +201,9 @@ arrays. Full request shapes, transition tables and error codes are in [SPEC.md](
 - Data lives in a single SQLite file (`data/caregrid.sqlite` by default) with foreign keys enabled,
   WAL mode for file databases, and an idempotent schema bootstrap at startup. Tables: `providers`,
   `clinic_sessions`, `clients`, `appointments`, `follow_ups`, `activity_events`, `meta`, plus the
-  API's `api_record_extras` extension table.
+  API's `api_record_extras` extension table, which persists fields the store schema does not model:
+  client `consentStatus`, `preferredName` and `preferredContact`, appointment `type` and follow-up
+  `priority`.
 - IDs are readable and stable (`cli-0001`, `apt-0001`, `fup-0001`, `prov-0001`), not UUIDs.
 - On first start with an empty database, a deterministic seed creates the 2026-10-06/07/08 clinic
   fixtures: five providers, six sessions, six clients, twelve appointments and seven follow-ups,

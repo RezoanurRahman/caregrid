@@ -66,16 +66,16 @@ clinic day does not shift with the server timezone.
 These are the tables actually created by `src/server/db.ts` (plus the API extension table created by
 `src/server/routes.ts`):
 
-| Table               | Key columns                                                                                                                          | Notes                                                                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `providers`         | `id`, `name`, `role`, `email` (unique), `phone`, `active`, `created_at`, `updated_at`                                                | Read-only through the API; populated by the seed.                                                                                                 |
-| `clinic_sessions`   | `id`, `date`, `start_time`, `end_time`, `location`, `capacity`, `lead_provider_id`, `notes`, timestamps                              | `CHECK (end_time > start_time)`. Read-only through the API; populated by the seed.                                                                |
-| `clients`           | `id`, `full_name`, `email`, `phone`, `date_of_birth`, `status` (`active`/`waitlist`/`inactive`), `notes`, timestamps                 | The API composes `full_name` from `firstName` + `lastName`.                                                                                       |
-| `appointments`      | `id`, `client_id`, `provider_id`, `session_id`, `date`, `start_time`, `end_time`, `status`, `reason`, `notes`, timestamps            | Status values are the public ones in §4.4.                                                                                                        |
-| `follow_ups`        | `id`, `client_id`, `appointment_id`, `assignee_id`, `title`, `detail`, `status`, `due_date`, `completed_at`, timestamps              | `completed_at` is set exactly when status is `done`.                                                                                              |
-| `activity_events`   | `id` (autoincrement), `entity_type` (`client`/`appointment`/`follow_up`), `entity_id`, `client_id`, `action`, `detail`, `created_at` | Append-only trail for creates and status changes; no update or delete path.                                                                       |
-| `meta`              | `key`, `value`                                                                                                                       | Holds the seed marker `seed_version`.                                                                                                             |
-| `api_record_extras` | `entity`, `record_id`, `data` (JSON), `updated_at`                                                                                   | API extension table for fields the store schema does not model: client `consentStatus`/`preferredName`, appointment `type`, follow-up `priority`. |
+| Table               | Key columns                                                                                                                          | Notes                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `providers`         | `id`, `name`, `role`, `email` (unique), `phone`, `active`, `created_at`, `updated_at`                                                | Read-only through the API; populated by the seed.                                                                                                                    |
+| `clinic_sessions`   | `id`, `date`, `start_time`, `end_time`, `location`, `capacity`, `lead_provider_id`, `notes`, timestamps                              | `CHECK (end_time > start_time)`. Read-only through the API; populated by the seed.                                                                                   |
+| `clients`           | `id`, `full_name`, `email`, `phone`, `date_of_birth`, `status` (`active`/`waitlist`/`inactive`), `notes`, timestamps                 | The API composes `full_name` from `firstName` + `lastName`.                                                                                                          |
+| `appointments`      | `id`, `client_id`, `provider_id`, `session_id`, `date`, `start_time`, `end_time`, `status`, `reason`, `notes`, timestamps            | Status values are the public ones in §4.4.                                                                                                                           |
+| `follow_ups`        | `id`, `client_id`, `appointment_id`, `assignee_id`, `title`, `detail`, `status`, `due_date`, `completed_at`, timestamps              | `completed_at` is set exactly when status is `done`.                                                                                                                 |
+| `activity_events`   | `id` (autoincrement), `entity_type` (`client`/`appointment`/`follow_up`), `entity_id`, `client_id`, `action`, `detail`, `created_at` | Append-only trail for creates and status changes; no update or delete path.                                                                                          |
+| `meta`              | `key`, `value`                                                                                                                       | Holds the seed marker `seed_version`.                                                                                                                                |
+| `api_record_extras` | `entity`, `record_id`, `data` (JSON), `updated_at`                                                                                   | API extension table for fields the store schema does not model: client `consentStatus`/`preferredName`/`preferredContact`, appointment `type`, follow-up `priority`. |
 
 Indexes cover appointments by session/provider/client/status, follow-ups by status/client/assignee,
 activity events by client and entity, sessions by date, and client names/status. Foreign keys are
@@ -85,8 +85,9 @@ enabled on every connection.
 
 The HTTP contract uses camelCase names and a small number of presentation-friendly aliases:
 
-- Clients: `firstName`, `lastName`, `preferredName`, `accessNotes`, `consentStatus`, `status`,
-  `dateOfBirth` (null when unknown).
+- Clients: `firstName`, `lastName`, `preferredName`, `preferredContact`
+  (`phone`|`sms`|`email`|`letter`|`in_person`, default `phone`), `accessNotes`, `consentStatus`,
+  `status`, `dateOfBirth` (null when unknown).
 - Sessions: `opensAt`/`closesAt` plus `startTime`/`endTime`, `booked`, `remaining` and
   `utilization` (0–1, rounded to two decimals).
 - Appointments: `date`, `startTime`, `endTime`, `type`, `status`, plus the denormalized
@@ -199,8 +200,11 @@ The landing view answers "how full is today, and what needs attention?".
 
 - **AC 2.1** `POST /api/clients` requires a name (either `firstName` + `lastName` or `fullName`) and
   a phone. `email`, `preferredName`, `dateOfBirth`, `accessNotes`/`notes`, `consentStatus`
-  (`pending`|`granted`|`declined`) and `status` (`active`|`archived`|`waitlist`) are optional.
-  Success returns `201` with `Location: /api/clients/:id` and the created client.
+  (`pending`|`granted`|`declined`), `preferredContact`
+  (`phone`|`sms`|`email`|`letter`|`in_person`, default `phone`) and `status`
+  (`active`|`archived`|`waitlist`) are optional. Success returns `201` with
+  `Location: /api/clients/:id` and the created client; an omitted `preferredContact` is stored and
+  returned as `phone`.
 - **AC 2.2** Invalid input returns `400 VALIDATION` with `details.issues: [{ path, message }]`. The
   UI validates the same rules before submitting, renders field-level and form-level errors, and
   keeps the entered values so nothing has to be retyped.
@@ -307,14 +311,15 @@ client update/archive/restore, `/api/audit`, appointment reschedule/field update
 
 ### 6.1 Request enums
 
-| Field              | Values                                                                      |
-| ------------------ | --------------------------------------------------------------------------- |
-| Appointment type   | `intake`, `check_in`, `follow_up`, `screening`, `other`                     |
-| Appointment status | `requested`, `confirmed`, `checked_in`, `completed`, `no_show`, `cancelled` |
-| Follow-up status   | `open`, `in_progress`, `done`, `dismissed`                                  |
-| Follow-up priority | `low`, `normal`, `high`                                                     |
-| Client consent     | `pending`, `granted`, `declined`                                            |
-| Client status      | `active`, `archived`, `waitlist` (the API stores `archived` as `inactive`)  |
+| Field                    | Values                                                                      |
+| ------------------------ | --------------------------------------------------------------------------- |
+| Appointment type         | `intake`, `check_in`, `follow_up`, `screening`, `other`                     |
+| Appointment status       | `requested`, `confirmed`, `checked_in`, `completed`, `no_show`, `cancelled` |
+| Follow-up status         | `open`, `in_progress`, `done`, `dismissed`                                  |
+| Follow-up priority       | `low`, `normal`, `high`                                                     |
+| Client consent           | `pending`, `granted`, `declined`                                            |
+| Client preferred contact | `phone`, `sms`, `email`, `letter`, `in_person` (default `phone`)            |
+| Client status            | `active`, `archived`, `waitlist` (the API stores `archived` as `inactive`)  |
 
 ### 6.2 Health
 
@@ -450,6 +455,9 @@ capacity, no session) are shown inline on the form.
 - **Schema bootstrap:** idempotent `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` on
   every connection. `api_record_extras` is created by the API layer. There is no migration
   framework; the `user_version` pragma is the hook.
+- **Client extras:** client `consentStatus`, `preferredName` and `preferredContact` are persisted
+  as JSON rows in `api_record_extras`, so they survive close/reopen with the rest of the database.
+  A missing or unrecognised `preferredContact` reads back as `phone`.
 - **Seed:** when `CAREGRID_SEED` is not `none`, an empty database receives deterministic fixtures
   for a clinic on 2026-10-06, 2026-10-07 and 2026-10-08: five providers (one inactive), six
   sessions, six clients, twelve appointments with status history, and seven follow-ups, including
