@@ -87,24 +87,13 @@ export function appointmentStatusDescription(status: AppointmentStatus): string 
 }
 
 const APPOINTMENT_ACTIONS: Record<AppointmentStatus, StatusAction<AppointmentStatus>[]> = {
+  // The API's `requested` arrives as `scheduled`; both only allow confirm/cancel.
   scheduled: [
     {
       status: 'confirmed',
       label: 'Confirm',
       tone: 'primary',
       description: 'Mark that the client confirmed',
-    },
-    {
-      status: 'checked_in',
-      label: 'Check in',
-      tone: 'neutral',
-      description: 'Mark that the client arrived',
-    },
-    {
-      status: 'no_show',
-      label: 'No-show',
-      tone: 'neutral',
-      description: 'Mark that the client did not attend',
     },
     {
       status: 'cancelled',
@@ -140,6 +129,12 @@ const APPOINTMENT_ACTIONS: Record<AppointmentStatus, StatusAction<AppointmentSta
       tone: 'primary',
       description: 'Finish the visit',
     },
+    {
+      status: 'no_show',
+      label: 'No-show',
+      tone: 'neutral',
+      description: 'Mark that the client did not attend',
+    },
   ],
   completed: [],
   no_show: [],
@@ -156,7 +151,7 @@ const FOLLOW_UP_STATUS_META: Record<FollowUpStatus, { label: string; tone: Statu
   open: { label: 'Open', tone: 'info' },
   in_progress: { label: 'In progress', tone: 'warning' },
   done: { label: 'Done', tone: 'success' },
-  cancelled: { label: 'Cancelled', tone: 'muted' },
+  dismissed: { label: 'Dismissed', tone: 'muted' },
   unknown: { label: 'Unrecognised', tone: 'muted' },
 };
 
@@ -180,22 +175,34 @@ const FOLLOW_UP_ACTIONS: Record<FollowUpStatus, StatusAction<KnownFollowUpStatus
       description: 'Start working on this follow-up',
     },
     {
-      status: 'done',
-      label: 'Mark done',
-      tone: 'neutral',
-      description: 'Record this follow-up as done',
+      status: 'dismissed',
+      label: 'Dismiss',
+      tone: 'danger',
+      description: 'Close this follow-up without further action',
     },
   ],
   in_progress: [
+    {
+      status: 'open',
+      label: 'Reopen',
+      tone: 'neutral',
+      description: 'Move this follow-up back to the open queue',
+    },
     {
       status: 'done',
       label: 'Mark done',
       tone: 'primary',
       description: 'Record this follow-up as done',
     },
+    {
+      status: 'dismissed',
+      label: 'Dismiss',
+      tone: 'danger',
+      description: 'Close this follow-up without further action',
+    },
   ],
   done: [],
-  cancelled: [],
+  dismissed: [],
   unknown: [],
 };
 
@@ -225,8 +232,13 @@ export function priorityWeight(priority: Priority): number {
   return PRIORITY_META[priority].weight;
 }
 
+/** Terminal follow-ups (done or dismissed) are finished work, never "late". */
+function isFinishedFollowUp(status: FollowUpStatus): boolean {
+  return status === 'done' || status === 'dismissed';
+}
+
 export function isFollowUpOverdue(followUp: FollowUp, today: string = todayDateOnly()): boolean {
-  if (followUp.status === 'done' || followUp.status === 'cancelled') {
+  if (isFinishedFollowUp(followUp.status)) {
     return false;
   }
   return isPastDue(followUp.dueDate, today);
@@ -239,7 +251,7 @@ export function isFollowUpOverdue(followUp: FollowUp, today: string = todayDateO
  * coordinator reading a done task is not told it is late.
  */
 export function followUpDueText(followUp: FollowUp, today: string = todayDateOnly()): string {
-  if (followUp.status === 'done' || followUp.status === 'cancelled') {
+  if (isFinishedFollowUp(followUp.status)) {
     return followUp.dueDate ? `Was due ${formatDayLabel(followUp.dueDate, today)}` : 'No due date';
   }
   return dueLabel(followUp.dueDate, today);

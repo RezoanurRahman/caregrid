@@ -31,7 +31,11 @@ export const APPOINTMENT_STATUSES = [
 export type KnownAppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
 export type AppointmentStatus = KnownAppointmentStatus | 'unknown';
 
-export const FOLLOW_UP_STATUSES = ['open', 'in_progress', 'done', 'cancelled'] as const;
+/**
+ * Mirror of the server's follow-up lifecycle. `dismissed` is terminal; legacy payloads that still
+ * report `cancelled` are normalised to it in `normalize.ts`.
+ */
+export const FOLLOW_UP_STATUSES = ['open', 'in_progress', 'done', 'dismissed'] as const;
 
 export type KnownFollowUpStatus = (typeof FOLLOW_UP_STATUSES)[number];
 export type FollowUpStatus = KnownFollowUpStatus | 'unknown';

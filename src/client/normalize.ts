@@ -252,8 +252,11 @@ const FOLLOW_UP_STATUS_ALIASES: Record<string, KnownFollowUpStatus> = {
   complete: 'done',
   completed: 'done',
   closed: 'done',
-  cancelled: 'cancelled',
-  canceled: 'cancelled',
+  dismissed: 'dismissed',
+  dismiss: 'dismissed',
+  // Legacy payloads used `cancelled` for a follow-up that needed no further action.
+  cancelled: 'dismissed',
+  canceled: 'dismissed',
 };
 
 export function normalizeFollowUpStatus(value: unknown): FollowUpStatus {

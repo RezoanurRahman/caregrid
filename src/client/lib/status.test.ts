@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { normalizeAppointmentStatus, normalizeFollowUpStatus } from '../normalize.js';
 import {
   appointmentActions,
   appointmentStatusLabel,
@@ -10,6 +11,7 @@ import {
   followUpActions,
   followUpDueText,
   followUpStatusLabel,
+  followUpStatusTone,
   isFollowUpOverdue,
   matchesClientSearch,
   priorityLabel,
@@ -89,11 +91,9 @@ describe('appointment status vocabulary', () => {
     expect(appointmentStatusTone('no_show')).toBe('warning');
   });
 
-  it('offers only valid transitions per status', () => {
+  it('offers exactly the transitions the server accepts per status', () => {
     expect(appointmentActions('scheduled').map((action) => action.status)).toEqual([
       'confirmed',
-      'checked_in',
-      'no_show',
       'cancelled',
     ]);
     expect(appointmentActions('confirmed').map((action) => action.status)).toEqual([
@@ -101,17 +101,39 @@ describe('appointment status vocabulary', () => {
       'no_show',
       'cancelled',
     ]);
-    expect(appointmentActions('checked_in').map((action) => action.status)).toEqual(['completed']);
+    expect(appointmentActions('checked_in').map((action) => action.status)).toEqual([
+      'completed',
+      'no_show',
+    ]);
     expect(appointmentActions('completed')).toEqual([]);
     expect(appointmentActions('no_show')).toEqual([]);
     expect(appointmentActions('cancelled')).toEqual([]);
     expect(appointmentActions('unknown')).toEqual([]);
+  });
+
+  it('never offers the requested -> checked_in/no_show shortcut', () => {
+    const scheduled = appointmentActions('scheduled').map((action) => action.status);
+    expect(scheduled).not.toContain('checked_in');
+    expect(scheduled).not.toContain('no_show');
+    expect(scheduled).toEqual(['confirmed', 'cancelled']);
+  });
+
+  it('sends API status values the server accepts, never the local scheduled alias', () => {
+    const offered = (['scheduled', 'confirmed', 'checked_in'] as const).flatMap((status) =>
+      appointmentActions(status).map((action) => action.status),
+    );
+    expect(new Set(offered)).toEqual(
+      new Set(['confirmed', 'cancelled', 'checked_in', 'no_show', 'completed']),
+    );
+    expect(offered).not.toContain('scheduled');
   });
 });
 
 describe('follow-up status vocabulary', () => {
   it('labels statuses and priorities', () => {
     expect(followUpStatusLabel('in_progress')).toBe('In progress');
+    expect(followUpStatusLabel('dismissed')).toBe('Dismissed');
+    expect(followUpStatusTone('dismissed')).toBe('muted');
     expect(followUpStatusLabel('unknown', 'escalated')).toBe('escalated');
     expect(priorityLabel('high')).toBe('High priority');
     expect(priorityTone('high')).toBe('danger');
@@ -119,11 +141,28 @@ describe('follow-up status vocabulary', () => {
   });
 
   it('offers only valid transitions per status', () => {
-    expect(followUpActions('open').map((action) => action.status)).toEqual(['in_progress', 'done']);
-    expect(followUpActions('in_progress').map((action) => action.status)).toEqual(['done']);
+    expect(followUpActions('open').map((action) => action.status)).toEqual([
+      'in_progress',
+      'dismissed',
+    ]);
+    expect(followUpActions('in_progress').map((action) => action.status)).toEqual([
+      'open',
+      'done',
+      'dismissed',
+    ]);
     expect(followUpActions('done')).toEqual([]);
-    expect(followUpActions('cancelled')).toEqual([]);
+    expect(followUpActions('dismissed')).toEqual([]);
     expect(followUpActions('unknown')).toEqual([]);
+  });
+
+  it('maps the API vocabulary onto the local vocabulary', () => {
+    expect(normalizeAppointmentStatus('requested')).toBe('scheduled');
+    expect(normalizeAppointmentStatus('scheduled')).toBe('scheduled');
+    expect(normalizeFollowUpStatus('dismissed')).toBe('dismissed');
+    expect(normalizeFollowUpStatus('Dismiss')).toBe('dismissed');
+    // Legacy payloads reported dismissed work as cancelled.
+    expect(normalizeFollowUpStatus('cancelled')).toBe('dismissed');
+    expect(normalizeFollowUpStatus('canceled')).toBe('dismissed');
   });
 
   it('treats only past, unfinished work as overdue', () => {
@@ -134,7 +173,7 @@ describe('follow-up status vocabulary', () => {
     expect(isFollowUpOverdue(followUp({ dueDate: '2026-10-01', status: 'done' }), TODAY)).toBe(
       false,
     );
-    expect(isFollowUpOverdue(followUp({ dueDate: '2026-10-01', status: 'cancelled' }), TODAY)).toBe(
+    expect(isFollowUpOverdue(followUp({ dueDate: '2026-10-01', status: 'dismissed' }), TODAY)).toBe(
       false,
     );
   });
@@ -147,7 +186,7 @@ describe('follow-up status vocabulary', () => {
     expect(followUpDueText(followUp({ dueDate: '2026-09-30', status: 'done' }), TODAY)).toBe(
       'Was due Wed, Sep 30',
     );
-    expect(followUpDueText(followUp({ dueDate: '2026-09-30', status: 'cancelled' }), TODAY)).toBe(
+    expect(followUpDueText(followUp({ dueDate: '2026-09-30', status: 'dismissed' }), TODAY)).toBe(
       'Was due Wed, Sep 30',
     );
     expect(followUpDueText(followUp({ dueDate: '' }), TODAY)).toBe('No due date');
@@ -160,8 +199,9 @@ describe('follow-up status vocabulary', () => {
       followUp({ id: 'b', status: 'in_progress', dueDate: '2026-10-09' }),
       followUp({ id: 'c', status: 'done', dueDate: '2026-10-02' }),
       followUp({ id: 'd', status: 'open', dueDate: '2026-10-20' }),
+      followUp({ id: 'e', status: 'dismissed', dueDate: '2026-10-02' }),
     ];
-    expect(filterFollowUps(items, 'all', TODAY)).toHaveLength(4);
+    expect(filterFollowUps(items, 'all', TODAY)).toHaveLength(5);
     expect(filterFollowUps(items, 'open', TODAY).map((item) => item.id)).toEqual(['a', 'd']);
     expect(filterFollowUps(items, 'in_progress', TODAY).map((item) => item.id)).toEqual(['b']);
     expect(filterFollowUps(items, 'done', TODAY).map((item) => item.id)).toEqual(['c']);
