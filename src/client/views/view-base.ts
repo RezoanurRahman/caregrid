@@ -1,6 +1,6 @@
-import { toApiError } from "../api.js";
-import { CaregridElement } from "../lib/element.js";
-import type { NoticeTone, ViewKey } from "../types.js";
+import { toApiError } from '../api.js';
+import { CaregridElement } from '../lib/element.js';
+import type { NoticeTone, ViewKey } from '../types.js';
 
 /**
  * Shared behaviour for the four workspace views.
@@ -11,9 +11,9 @@ import type { NoticeTone, ViewKey } from "../types.js";
  */
 export abstract class CaregridView extends CaregridElement {
   /** Pushes a message to the shell's polite live region and its toast stack. */
-  protected announce(message: string, tone: NoticeTone = "success"): void {
+  protected announce(message: string, tone: NoticeTone = 'success'): void {
     this.dispatchEvent(
-      new CustomEvent("caregrid:announce", {
+      new CustomEvent('caregrid:announce', {
         detail: { message, tone },
         bubbles: true,
         composed: true,
@@ -21,9 +21,9 @@ export abstract class CaregridView extends CaregridElement {
     );
   }
 
-  protected navigate(view: ViewKey, intent = ""): void {
+  protected navigate(view: ViewKey, intent = ''): void {
     this.dispatchEvent(
-      new CustomEvent("caregrid:navigate", {
+      new CustomEvent('caregrid:navigate', {
         detail: { view, intent },
         bubbles: true,
         composed: true,
@@ -33,15 +33,13 @@ export abstract class CaregridView extends CaregridElement {
 
   /** Tells the shell that fresh data is on screen, so the context line can show "Updated …". */
   protected notifyRefreshed(): void {
-    this.dispatchEvent(
-      new CustomEvent("caregrid:refreshed", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent('caregrid:refreshed', { bubbles: true, composed: true }));
   }
 
   protected publishContext(detail: Record<string, string>): void {
     const cleaned: Record<string, string> = {};
     for (const [key, value] of Object.entries(detail)) {
-      if (typeof value === "string" && value.trim() !== "") {
+      if (typeof value === 'string' && value.trim() !== '') {
         cleaned[key] = value.trim();
       }
     }
@@ -49,7 +47,7 @@ export abstract class CaregridView extends CaregridElement {
       return;
     }
     this.dispatchEvent(
-      new CustomEvent("caregrid:context", {
+      new CustomEvent('caregrid:context', {
         detail: cleaned,
         bubbles: true,
         composed: true,
@@ -65,9 +63,7 @@ export abstract class CaregridView extends CaregridElement {
    */
   protected describeFailure(error: unknown, action: string): string {
     const apiError = toApiError(error, `We could not ${action}.`);
-    return apiError.message.trim() !== ""
-      ? apiError.message
-      : `We could not ${action}.`;
+    return apiError.message.trim() !== '' ? apiError.message : `We could not ${action}.`;
   }
 
   /** True when the element is still connected and its request was not abandoned. */

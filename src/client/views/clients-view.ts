@@ -1,33 +1,29 @@
-import { html } from "lit";
-import { createClient, getClient, listClients, toApiError } from "../api.js";
-import { defineOnce } from "../lib/define.js";
-import { CaregridView } from "./view-base.js";
-import "../components/appointment-summary.js";
-import "../components/app-dialog.js";
-import "../components/followup-summary.js";
-import "../components/state-panel.js";
-import "../components/status-badge.js";
-import { formatDayLabel, formatTimestamp, initials } from "../lib/format.js";
+import { html } from 'lit';
+import { createClient, getClient, listClients, toApiError } from '../api.js';
+import { defineOnce } from '../lib/define.js';
+import { CaregridView } from './view-base.js';
+import '../components/appointment-summary.js';
+import '../components/app-dialog.js';
+import '../components/followup-summary.js';
+import '../components/state-panel.js';
+import '../components/status-badge.js';
+import { formatDayLabel, formatTimestamp, initials } from '../lib/format.js';
 import {
   emptyClientForm,
   errorSummary,
   mapServerFieldErrors,
   validateClientForm,
-} from "../lib/validation.js";
-import type { FieldErrors } from "../lib/validation.js";
-import {
-  filterClients,
-  sortAppointments,
-  sortFollowUps,
-} from "../lib/status.js";
-import type { ClientDetail, Client, LoadState } from "../types.js";
+} from '../lib/validation.js';
+import type { FieldErrors } from '../lib/validation.js';
+import { filterClients, sortAppointments, sortFollowUps } from '../lib/status.js';
+import type { ClientDetail, Client, LoadState } from '../types.js';
 
 const PREFERRED_CONTACT_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "phone", label: "Phone call" },
-  { value: "sms", label: "Text message" },
-  { value: "email", label: "Email" },
-  { value: "letter", label: "Letter" },
-  { value: "in_person", label: "In person at the clinic" },
+  { value: 'phone', label: 'Phone call' },
+  { value: 'sms', label: 'Text message' },
+  { value: 'email', label: 'Email' },
+  { value: 'letter', label: 'Letter' },
+  { value: 'in_person', label: 'In person at the clinic' },
 ];
 
 /**
@@ -79,21 +75,21 @@ export class CaregridClientsView extends CaregridView {
 
   constructor() {
     super();
-    this.intent = "";
-    this.search = "";
-    this.listState = "idle";
-    this.listError = "";
+    this.intent = '';
+    this.search = '';
+    this.listState = 'idle';
+    this.listError = '';
     this.clients = [];
-    this.selectedId = "";
-    this.detailState = "idle";
-    this.detailError = "";
+    this.selectedId = '';
+    this.detailState = 'idle';
+    this.detailError = '';
     this.detail = null;
     this.dialogOpen = false;
     this.form = emptyClientForm();
     this.formErrors = {};
-    this.formAlert = "";
+    this.formAlert = '';
     this.submitting = false;
-    this.statusMessage = "";
+    this.statusMessage = '';
   }
 
   override connectedCallback(): void {
@@ -112,7 +108,7 @@ export class CaregridClientsView extends CaregridView {
   }
 
   protected override willUpdate(changed: Map<string, unknown>): void {
-    if (changed.has("intent") && this.intent === "new" && !this.dialogOpen) {
+    if (changed.has('intent') && this.intent === 'new' && !this.dialogOpen) {
       this.openCreateDialog();
     }
   }
@@ -121,8 +117,8 @@ export class CaregridClientsView extends CaregridView {
     this.listController?.abort();
     const controller = new AbortController();
     this.listController = controller;
-    this.listState = this.clients.length === 0 ? "loading" : "ready";
-    this.listError = "";
+    this.listState = this.clients.length === 0 ? 'loading' : 'ready';
+    this.listError = '';
     try {
       const clients = await listClients({
         search: this.search.trim(),
@@ -132,21 +128,18 @@ export class CaregridClientsView extends CaregridView {
         return;
       }
       this.clients = clients;
-      this.listState = "ready";
-      if (
-        this.selectedId !== "" &&
-        !clients.some((client) => client.id === this.selectedId)
-      ) {
-        this.selectedId = "";
+      this.listState = 'ready';
+      if (this.selectedId !== '' && !clients.some((client) => client.id === this.selectedId)) {
+        this.selectedId = '';
         this.detail = null;
-        this.detailState = "idle";
+        this.detailState = 'idle';
       }
     } catch (error) {
       if (!this.isCurrent(controller.signal)) {
         return;
       }
-      this.listError = this.describeFailure(error, "load the client list");
-      this.listState = "error";
+      this.listError = this.describeFailure(error, 'load the client list');
+      this.listState = 'error';
     }
   }
 
@@ -154,34 +147,34 @@ export class CaregridClientsView extends CaregridView {
     this.detailController?.abort();
     const controller = new AbortController();
     this.detailController = controller;
-    this.detailState = "loading";
-    this.detailError = "";
+    this.detailState = 'loading';
+    this.detailError = '';
     try {
       const detail = await getClient(id, controller.signal);
       if (!this.isCurrent(controller.signal) || this.selectedId !== id) {
         return;
       }
       this.detail = detail;
-      this.detailState = "ready";
+      this.detailState = 'ready';
     } catch (error) {
       if (!this.isCurrent(controller.signal) || this.selectedId !== id) {
         return;
       }
       this.detail = null;
-      this.detailError = this.describeFailure(error, "load that client record");
-      this.detailState = "error";
+      this.detailError = this.describeFailure(error, 'load that client record');
+      this.detailState = 'error';
     }
   }
 
   private selectClient(client: Client): void {
     if (this.selectedId === client.id) {
-      this.selectedId = "";
+      this.selectedId = '';
       this.detail = null;
-      this.detailState = "idle";
+      this.detailState = 'idle';
       return;
     }
     this.selectedId = client.id;
-    this.detailState = "loading";
+    this.detailState = 'loading';
     this.detail = null;
     void this.loadDetail(client.id);
   }
@@ -199,7 +192,7 @@ export class CaregridClientsView extends CaregridView {
   }
 
   private clearSearch(): void {
-    this.search = "";
+    this.search = '';
     if (this.searchTimer !== null) {
       window.clearTimeout(this.searchTimer);
       this.searchTimer = null;
@@ -210,31 +203,28 @@ export class CaregridClientsView extends CaregridView {
   private openCreateDialog(): void {
     this.form = emptyClientForm();
     this.formErrors = {};
-    this.formAlert = "";
+    this.formAlert = '';
     this.formSubmitted = false;
     this.dialogOpen = true;
   }
 
   private closeDialog(): void {
     this.dialogOpen = false;
-    this.formAlert = "";
+    this.formAlert = '';
     this.formErrors = {};
     this.formSubmitted = false;
   }
 
   private handlePanelAction(event: CustomEvent<{ action?: string }>): void {
     event.stopPropagation();
-    if (event.detail?.action === "detail-retry" && this.selectedId !== "") {
+    if (event.detail?.action === 'detail-retry' && this.selectedId !== '') {
       void this.loadDetail(this.selectedId);
       return;
     }
     void this.loadClients();
   }
 
-  private handleFieldInput(
-    field: keyof ReturnType<typeof emptyClientForm>,
-    value: string,
-  ): void {
+  private handleFieldInput(field: keyof ReturnType<typeof emptyClientForm>, value: string): void {
     this.form = { ...this.form, [field]: value };
     if (this.formSubmitted) {
       this.formErrors = validateClientForm(this.form).errors;
@@ -244,7 +234,7 @@ export class CaregridClientsView extends CaregridView {
   private async handleSubmit(event: Event): Promise<void> {
     event.preventDefault();
     this.formSubmitted = true;
-    this.formAlert = "";
+    this.formAlert = '';
     const result = validateClientForm(this.form);
     this.formErrors = result.errors;
     if (!result.valid) {
@@ -262,45 +252,40 @@ export class CaregridClientsView extends CaregridView {
         consentGranted: this.form.consentGranted,
         notes: this.form.notes.trim(),
       });
-      const name =
-        created.fullName ||
-        `${this.form.firstName} ${this.form.lastName}`.trim();
+      const name = created.fullName || `${this.form.firstName} ${this.form.lastName}`.trim();
       this.dialogOpen = false;
       this.form = emptyClientForm();
       this.formErrors = {};
       this.formSubmitted = false;
       this.statusMessage = `${name} was added to the client roster.`;
-      this.announce(`${name} was added to the client roster.`, "success");
+      this.announce(`${name} was added to the client roster.`, 'success');
       await this.loadClients();
-      if (created.id !== "") {
+      if (created.id !== '') {
         this.selectedId = created.id;
         void this.loadDetail(created.id);
       }
     } catch (error) {
-      const apiError = toApiError(error, "We could not save that client.");
+      const apiError = toApiError(error, 'We could not save that client.');
       const mapped = mapServerFieldErrors(apiError.fieldErrors, [
-        "firstName",
-        "lastName",
-        "phone",
-        "email",
-        "preferredContact",
-        "consentGranted",
-        "notes",
+        'firstName',
+        'lastName',
+        'phone',
+        'email',
+        'preferredContact',
+        'consentGranted',
+        'notes',
       ]);
       if (Object.keys(mapped).length > 0) {
         this.formErrors = { ...this.formErrors, ...mapped };
       }
-      this.formAlert =
-        Object.keys(mapped).length > 0
-          ? errorSummary(mapped)
-          : apiError.message;
+      this.formAlert = Object.keys(mapped).length > 0 ? errorSummary(mapped) : apiError.message;
     } finally {
       this.submitting = false;
     }
   }
 
   private renderList() {
-    if (this.listState === "loading" || this.listState === "idle") {
+    if (this.listState === 'loading' || this.listState === 'idle') {
       return html`
         <caregrid-state-panel
           variant="loading"
@@ -310,7 +295,7 @@ export class CaregridClientsView extends CaregridView {
         ></caregrid-state-panel>
       `;
     }
-    if (this.listState === "error") {
+    if (this.listState === 'error') {
       return html`
         <caregrid-state-panel
           variant="error"
@@ -327,11 +312,11 @@ export class CaregridClientsView extends CaregridView {
       return html`
         <caregrid-state-panel
           variant="empty"
-          title=${this.search.trim() === "" ? "No clients yet" : "No clients match that search"}
+          title=${this.search.trim() === '' ? 'No clients yet' : 'No clients match that search'}
           message=${
-            this.search.trim() === ""
-              ? "Add the first client to start booking appointments and follow-ups."
-              : "Try a different name, phone number or email address."
+            this.search.trim() === ''
+              ? 'Add the first client to start booking appointments and follow-ups.'
+              : 'Try a different name, phone number or email address.'
           }
           data-testid="clients-empty"
         ></caregrid-state-panel>
@@ -349,44 +334,40 @@ export class CaregridClientsView extends CaregridView {
     return html`
       <div role="listitem">
         <button
-          class="client-row${selected ? " is-selected" : ""}"
+          class="client-row${selected ? ' is-selected' : ''}"
           type="button"
           data-testid=${`client-row-${client.id}`}
-          aria-expanded=${selected ? "true" : "false"}
+          aria-expanded=${selected ? 'true' : 'false'}
           @click=${() => this.selectClient(client)}
         >
-          <span class="client-row__avatar" aria-hidden="true"
-            >${initials(client.fullName)}</span
-          >
+          <span class="client-row__avatar" aria-hidden="true">${initials(client.fullName)}</span>
           <span class="client-row__body">
             <span class="client-row__name">${client.fullName}</span>
             <span class="client-row__meta">
-              ${[client.phone, client.email].filter((part) => part.trim() !== "").join(" · ") || "No contact details"}
+              ${[client.phone, client.email].filter((part) => part.trim() !== '').join(' · ') || 'No contact details'}
             </span>
             <span class="client-row__badges">
               <caregrid-status-badge
-                label=${client.status || "active"}
+                label=${client.status || 'active'}
                 tone="neutral"
                 size="small"
                 detail="Client status"
               ></caregrid-status-badge>
               <caregrid-status-badge
-                label=${client.consent.granted ? "Consent on file" : "Consent missing"}
-                tone=${client.consent.granted ? "success" : "warning"}
+                label=${client.consent.granted ? 'Consent on file' : 'Consent missing'}
+                tone=${client.consent.granted ? 'success' : 'warning'}
                 size="small"
               ></caregrid-status-badge>
             </span>
           </span>
-          <span class="client-row__hint"
-            >${selected ? "Hide record" : "Open record"}</span
-          >
+          <span class="client-row__hint">${selected ? 'Hide record' : 'Open record'}</span>
         </button>
       </div>
     `;
   }
 
   private renderDetail() {
-    if (this.selectedId === "") {
+    if (this.selectedId === '') {
       return html`
         <caregrid-state-panel
           variant="empty"
@@ -396,7 +377,7 @@ export class CaregridClientsView extends CaregridView {
         ></caregrid-state-panel>
       `;
     }
-    if (this.detailState === "loading") {
+    if (this.detailState === 'loading') {
       return html`
         <caregrid-state-panel
           variant="loading"
@@ -406,7 +387,7 @@ export class CaregridClientsView extends CaregridView {
         ></caregrid-state-panel>
       `;
     }
-    if (this.detailState === "error" || this.detail === null) {
+    if (this.detailState === 'error' || this.detail === null) {
       return html`
         <caregrid-state-panel
           variant="error"
@@ -422,50 +403,39 @@ export class CaregridClientsView extends CaregridView {
     const appointments = sortAppointments(detail.appointments);
     const followUps = sortFollowUps(detail.followUps);
     return html`
-      <article
-        class="detail"
-        aria-labelledby="client-detail-heading"
-        data-testid="client-detail"
-      >
+      <article class="detail" aria-labelledby="client-detail-heading" data-testid="client-detail">
         <header class="detail__header">
           <div>
             <p class="view__eyebrow">Client record</p>
-            <h2 class="detail__title" id="client-detail-heading">
-              ${detail.fullName}
-            </h2>
+            <h2 class="detail__title" id="client-detail-heading">${detail.fullName}</h2>
             <p class="detail__meta">
-              ${detail.since ? `Registered ${formatDayLabel(detail.since)}` : "Registration date not recorded"}
+              ${detail.since ? `Registered ${formatDayLabel(detail.since)}` : 'Registration date not recorded'}
             </p>
           </div>
           <div class="detail__badges">
             <caregrid-status-badge
-              label=${detail.status || "active"}
+              label=${detail.status || 'active'}
               tone="neutral"
               detail="Client status"
             ></caregrid-status-badge>
             <caregrid-status-badge
-              label=${detail.consent.granted ? "Consent on file" : "Consent missing"}
-              tone=${detail.consent.granted ? "success" : "warning"}
+              label=${detail.consent.granted ? 'Consent on file' : 'Consent missing'}
+              tone=${detail.consent.granted ? 'success' : 'warning'}
               detail=${detail.consent.date ? `Recorded ${formatDayLabel(detail.consent.date)}` : detail.consent.label}
             ></caregrid-status-badge>
           </div>
         </header>
         <div class="detail__grid">
-          <section
-            class="detail__block"
-            aria-labelledby="client-contact-heading"
-          >
-            <h3 class="detail__subheading" id="client-contact-heading">
-              Contact
-            </h3>
+          <section class="detail__block" aria-labelledby="client-contact-heading">
+            <h3 class="detail__subheading" id="client-contact-heading">Contact</h3>
             <dl class="detail-list">
               <div>
                 <dt>Phone</dt>
-                <dd>${detail.phone || "Not recorded"}</dd>
+                <dd>${detail.phone || 'Not recorded'}</dd>
               </div>
               <div>
                 <dt>Email</dt>
-                <dd>${detail.email || "Not recorded"}</dd>
+                <dd>${detail.email || 'Not recorded'}</dd>
               </div>
               <div>
                 <dt>Preferred contact</dt>
@@ -473,53 +443,39 @@ export class CaregridClientsView extends CaregridView {
               </div>
               <div>
                 <dt>Language</dt>
-                <dd>${detail.language || "Not recorded"}</dd>
+                <dd>${detail.language || 'Not recorded'}</dd>
               </div>
             </dl>
           </section>
-          <section
-            class="detail__block"
-            aria-labelledby="client-consent-heading"
-          >
-            <h3 class="detail__subheading" id="client-consent-heading">
-              Consent
-            </h3>
+          <section class="detail__block" aria-labelledby="client-consent-heading">
+            <h3 class="detail__subheading" id="client-consent-heading">Consent</h3>
             <dl class="detail-list">
               <div>
                 <dt>Care coordination</dt>
-                <dd>${detail.consent.granted ? "Recorded" : "Not recorded"}</dd>
+                <dd>${detail.consent.granted ? 'Recorded' : 'Not recorded'}</dd>
               </div>
               <div>
                 <dt>Recorded on</dt>
                 <dd>
-                  ${detail.consent.date ? formatDayLabel(detail.consent.date) : "Not recorded"}
+                  ${detail.consent.date ? formatDayLabel(detail.consent.date) : 'Not recorded'}
                 </dd>
               </div>
               <div>
                 <dt>Notes</dt>
-                <dd>${detail.notes || "No intake notes"}</dd>
+                <dd>${detail.notes || 'No intake notes'}</dd>
               </div>
             </dl>
           </section>
         </div>
-        <section
-          class="detail__block"
-          aria-labelledby="client-appointments-heading"
-        >
+        <section class="detail__block" aria-labelledby="client-appointments-heading">
           <h3 class="detail__subheading" id="client-appointments-heading">
             Appointments (${appointments.length})
           </h3>
           ${
             appointments.length === 0
-              ? html`<p class="muted">
-                  No appointments booked for this client yet.
-                </p>`
+              ? html`<p class="muted">No appointments booked for this client yet.</p>`
               : html`
-                  <div
-                    class="summary-list"
-                    role="list"
-                    aria-label="Client appointments"
-                  >
+                  <div class="summary-list" role="list" aria-label="Client appointments">
                     ${appointments.map(
                       (appointment) => html`
                         <caregrid-appointment-summary
@@ -532,24 +488,15 @@ export class CaregridClientsView extends CaregridView {
                 `
           }
         </section>
-        <section
-          class="detail__block"
-          aria-labelledby="client-followups-heading"
-        >
+        <section class="detail__block" aria-labelledby="client-followups-heading">
           <h3 class="detail__subheading" id="client-followups-heading">
             Follow-ups (${followUps.length})
           </h3>
           ${
             followUps.length === 0
-              ? html`<p class="muted">
-                  No follow-ups recorded for this client.
-                </p>`
+              ? html`<p class="muted">No follow-ups recorded for this client.</p>`
               : html`
-                  <div
-                    class="summary-list"
-                    role="list"
-                    aria-label="Client follow-ups"
-                  >
+                  <div class="summary-list" role="list" aria-label="Client follow-ups">
                     ${followUps.map(
                       (followUp) => html`
                         <caregrid-followup-summary
@@ -562,18 +509,11 @@ export class CaregridClientsView extends CaregridView {
                 `
           }
         </section>
-        <section
-          class="detail__block"
-          aria-labelledby="client-activity-heading"
-        >
-          <h3 class="detail__subheading" id="client-activity-heading">
-            Activity timeline
-          </h3>
+        <section class="detail__block" aria-labelledby="client-activity-heading">
+          <h3 class="detail__subheading" id="client-activity-heading">Activity timeline</h3>
           ${
             detail.activity.length === 0
-              ? html`<p class="muted">
-                  No activity recorded for this client yet.
-                </p>`
+              ? html`<p class="muted">No activity recorded for this client yet.</p>`
               : html`
                   <ol class="timeline">
                     ${detail.activity.map(
@@ -581,9 +521,7 @@ export class CaregridClientsView extends CaregridView {
                         <li class="timeline__item">
                           <p class="timeline__summary">${entry.summary}</p>
                           ${entry.detail ? html`<p class="timeline__detail">${entry.detail}</p>` : null}
-                          <p class="timeline__stamp">
-                            ${formatTimestamp(entry.at)}
-                          </p>
+                          <p class="timeline__stamp">${formatTimestamp(entry.at)}</p>
                         </li>
                       `,
                     )}
@@ -610,23 +548,14 @@ export class CaregridClientsView extends CaregridView {
       >
         <h2 class="detail__title" id="client-dialog-heading">Add a client</h2>
         <p class="muted">
-          Record the details the clinic needs to coordinate care. Only the
-          client's name is required.
+          Record the details the clinic needs to coordinate care. Only the client's name is
+          required.
         </p>
-        <form
-          class="form"
-          data-testid="client-form"
-          novalidate
-          @submit=${this.handleSubmit}
-        >
+        <form class="form" data-testid="client-form" novalidate @submit=${this.handleSubmit}>
           ${
             this.formAlert
               ? html`
-                  <p
-                    class="alert alert--error"
-                    role="alert"
-                    data-testid="client-form-error"
-                  >
+                  <p class="alert alert--error" role="alert" data-testid="client-form-error">
                     ${this.formAlert}
                   </p>
                 `
@@ -634,9 +563,7 @@ export class CaregridClientsView extends CaregridView {
           }
           <div class="field-grid">
             <p class="field">
-              <label class="field__label" for="client-first-name"
-                >First name</label
-              >
+              <label class="field__label" for="client-first-name">First name</label>
               <input
                 class="input"
                 id="client-first-name"
@@ -646,9 +573,9 @@ export class CaregridClientsView extends CaregridView {
                 required
                 data-testid="client-first-name"
                 .value=${this.form.firstName}
-                aria-invalid=${errors.firstName ? "true" : "false"}
-                aria-describedby=${errors.firstName ? "client-first-name-error" : undefined}
-                @input=${(event: Event) => this.handleFieldInput("firstName", (event.target as HTMLInputElement).value)}
+                aria-invalid=${errors.firstName ? 'true' : 'false'}
+                aria-describedby=${errors.firstName ? 'client-first-name-error' : undefined}
+                @input=${(event: Event) => this.handleFieldInput('firstName', (event.target as HTMLInputElement).value)}
               />
               ${
                 errors.firstName
@@ -659,9 +586,7 @@ export class CaregridClientsView extends CaregridView {
               }
             </p>
             <p class="field">
-              <label class="field__label" for="client-last-name"
-                >Last name</label
-              >
+              <label class="field__label" for="client-last-name">Last name</label>
               <input
                 class="input"
                 id="client-last-name"
@@ -671,9 +596,9 @@ export class CaregridClientsView extends CaregridView {
                 required
                 data-testid="client-last-name"
                 .value=${this.form.lastName}
-                aria-invalid=${errors.lastName ? "true" : "false"}
-                aria-describedby=${errors.lastName ? "client-last-name-error" : undefined}
-                @input=${(event: Event) => this.handleFieldInput("lastName", (event.target as HTMLInputElement).value)}
+                aria-invalid=${errors.lastName ? 'true' : 'false'}
+                aria-describedby=${errors.lastName ? 'client-last-name-error' : undefined}
+                @input=${(event: Event) => this.handleFieldInput('lastName', (event.target as HTMLInputElement).value)}
               />
               ${
                 errors.lastName
@@ -694,15 +619,13 @@ export class CaregridClientsView extends CaregridView {
                 placeholder="555 0100"
                 data-testid="client-phone"
                 .value=${this.form.phone}
-                aria-invalid=${errors.phone ? "true" : "false"}
-                aria-describedby=${errors.phone ? "client-phone-error" : "client-phone-hint"}
-                @input=${(event: Event) => this.handleFieldInput("phone", (event.target as HTMLInputElement).value)}
+                aria-invalid=${errors.phone ? 'true' : 'false'}
+                aria-describedby=${errors.phone ? 'client-phone-error' : 'client-phone-hint'}
+                @input=${(event: Event) => this.handleFieldInput('phone', (event.target as HTMLInputElement).value)}
               />
               ${
                 errors.phone
-                  ? html`<span class="field__error" id="client-phone-error"
-                      >${errors.phone}</span
-                    >`
+                  ? html`<span class="field__error" id="client-phone-error">${errors.phone}</span>`
                   : html`<span class="field__hint" id="client-phone-hint"
                       >Include an area code where possible.</span
                     >`
@@ -718,22 +641,18 @@ export class CaregridClientsView extends CaregridView {
                 autocomplete="email"
                 data-testid="client-email"
                 .value=${this.form.email}
-                aria-invalid=${errors.email ? "true" : "false"}
-                aria-describedby=${errors.email ? "client-email-error" : undefined}
-                @input=${(event: Event) => this.handleFieldInput("email", (event.target as HTMLInputElement).value)}
+                aria-invalid=${errors.email ? 'true' : 'false'}
+                aria-describedby=${errors.email ? 'client-email-error' : undefined}
+                @input=${(event: Event) => this.handleFieldInput('email', (event.target as HTMLInputElement).value)}
               />
               ${
                 errors.email
-                  ? html`<span class="field__error" id="client-email-error"
-                      >${errors.email}</span
-                    >`
+                  ? html`<span class="field__error" id="client-email-error">${errors.email}</span>`
                   : null
               }
             </p>
             <p class="field">
-              <label class="field__label" for="client-preferred-contact"
-                >Preferred contact</label
-              >
+              <label class="field__label" for="client-preferred-contact">Preferred contact</label>
               <select
                 class="input"
                 id="client-preferred-contact"
@@ -742,22 +661,17 @@ export class CaregridClientsView extends CaregridView {
                 .value=${this.form.preferredContact}
                 @change=${(event: Event) =>
                   this.handleFieldInput(
-                    "preferredContact",
+                    'preferredContact',
                     (event.target as HTMLSelectElement).value,
                   )}
               >
                 ${PREFERRED_CONTACT_OPTIONS.map(
-                  (option) =>
-                    html`<option value=${option.value}>
-                      ${option.label}
-                    </option>`,
+                  (option) => html`<option value=${option.value}>${option.label}</option>`,
                 )}
               </select>
             </p>
             <p class="field field--wide">
-              <label class="field__label" for="client-notes"
-                >Intake notes</label
-              >
+              <label class="field__label" for="client-notes">Intake notes</label>
               <textarea
                 class="input input--textarea"
                 id="client-notes"
@@ -765,7 +679,7 @@ export class CaregridClientsView extends CaregridView {
                 rows="3"
                 data-testid="client-notes"
                 .value=${this.form.notes}
-                @input=${(event: Event) => this.handleFieldInput("notes", (event.target as HTMLTextAreaElement).value)}
+                @input=${(event: Event) => this.handleFieldInput('notes', (event.target as HTMLTextAreaElement).value)}
               ></textarea>
             </p>
             <p class="field field--wide">
@@ -777,14 +691,9 @@ export class CaregridClientsView extends CaregridView {
                   data-testid="client-consent"
                   .checked=${this.form.consentGranted}
                   @change=${(event: Event) =>
-                    this.handleConsentChange(
-                      (event.target as HTMLInputElement).checked,
-                    )}
+                    this.handleConsentChange((event.target as HTMLInputElement).checked)}
                 />
-                <span
-                  >Consent recorded for care coordination and follow-up
-                  contact</span
-                >
+                <span>Consent recorded for care coordination and follow-up contact</span>
               </label>
             </p>
           </div>
@@ -795,13 +704,9 @@ export class CaregridClientsView extends CaregridView {
               data-testid="client-submit"
               ?disabled=${this.submitting}
             >
-              ${this.submitting ? "Saving…" : "Save client"}
+              ${this.submitting ? 'Saving…' : 'Save client'}
             </button>
-            <button
-              class="button button--secondary"
-              type="button"
-              @click=${this.closeDialog}
-            >
+            <button class="button button--secondary" type="button" @click=${this.closeDialog}>
               Cancel
             </button>
           </div>
@@ -817,17 +722,15 @@ export class CaregridClientsView extends CaregridView {
   override render() {
     const visible = filterClients(this.clients, this.search);
     const countLabel =
-      this.listState === "ready"
+      this.listState === 'ready'
         ? `${visible.length} of ${this.clients.length} clients shown`
-        : "Client roster";
+        : 'Client roster';
     return html`
       <section class="view" aria-labelledby="clients-heading">
         <header class="view__header">
           <div class="view__heading">
             <p class="view__eyebrow">Clinic desk</p>
-            <h1 class="view__title" id="clients-heading" tabindex="-1">
-              Clients
-            </h1>
+            <h1 class="view__title" id="clients-heading" tabindex="-1">Clients</h1>
             <p class="view__subtitle">${countLabel}</p>
           </div>
           <div class="view__actions">
@@ -850,18 +753,13 @@ export class CaregridClientsView extends CaregridView {
         </header>
         <p class="view__status">${this.statusMessage}</p>
         <div class="split">
-          <section
-            class="card split__list"
-            aria-labelledby="clients-list-heading"
-          >
+          <section class="card split__list" aria-labelledby="clients-list-heading">
             <div class="card__header">
               <h2 class="card__title" id="clients-list-heading">Roster</h2>
             </div>
             <div class="toolbar">
               <p class="field field--grow">
-                <label class="field__label" for="client-search"
-                  >Search clients</label
-                >
+                <label class="field__label" for="client-search">Search clients</label>
                 <input
                   class="input"
                   id="client-search"
@@ -873,7 +771,7 @@ export class CaregridClientsView extends CaregridView {
                 />
               </p>
               ${
-                this.search.trim() !== ""
+                this.search.trim() !== ''
                   ? html`<button
                       class="button button--ghost"
                       type="button"
@@ -884,23 +782,15 @@ export class CaregridClientsView extends CaregridView {
                   : null
               }
             </div>
-            <div
-              class="split__scroll"
-              @caregrid:panel-action=${this.handlePanelAction}
-            >
+            <div class="split__scroll" @caregrid:panel-action=${this.handlePanelAction}>
               ${this.renderList()}
             </div>
           </section>
-          <section
-            class="card split__detail"
-            aria-labelledby="clients-detail-heading"
-          >
+          <section class="card split__detail" aria-labelledby="clients-detail-heading">
             <div class="card__header">
-              <h2 class="card__title" id="clients-detail-heading">
-                Client record
-              </h2>
+              <h2 class="card__title" id="clients-detail-heading">Client record</h2>
               ${
-                this.selectedId !== ""
+                this.selectedId !== ''
                   ? html`
                       <button
                         class="button button--ghost button--small"
@@ -913,10 +803,7 @@ export class CaregridClientsView extends CaregridView {
                   : null
               }
             </div>
-            <div
-              class="split__scroll"
-              @caregrid:panel-action=${this.handlePanelAction}
-            >
+            <div class="split__scroll" @caregrid:panel-action=${this.handlePanelAction}>
               ${this.renderDetail()}
             </div>
           </section>
@@ -927,27 +814,25 @@ export class CaregridClientsView extends CaregridView {
   }
 
   private clearSelection(): void {
-    this.selectedId = "";
+    this.selectedId = '';
     this.detail = null;
-    this.detailState = "idle";
-    this.detailError = "";
+    this.detailState = 'idle';
+    this.detailError = '';
   }
 }
 
 function preferredContactLabel(value: string): string {
-  const match = PREFERRED_CONTACT_OPTIONS.find(
-    (option) => option.value === value,
-  );
+  const match = PREFERRED_CONTACT_OPTIONS.find((option) => option.value === value);
   if (match) {
     return match.label;
   }
-  return value.trim() === "" ? "Not recorded" : value;
+  return value.trim() === '' ? 'Not recorded' : value;
 }
 
-defineOnce("caregrid-clients-view", CaregridClientsView);
+defineOnce('caregrid-clients-view', CaregridClientsView);
 
 declare global {
   interface HTMLElementTagNameMap {
-    "caregrid-clients-view": CaregridClientsView;
+    'caregrid-clients-view': CaregridClientsView;
   }
 }

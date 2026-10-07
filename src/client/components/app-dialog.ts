@@ -1,14 +1,14 @@
-import { css, html, LitElement } from "lit";
-import { defineOnce } from "../lib/define.js";
+import { css, html, LitElement } from 'lit';
+import { defineOnce } from '../lib/define.js';
 
 const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
   "[tabindex]:not([tabindex='-1'])",
-].join(",");
+].join(',');
 
 /**
  * `<caregrid-dialog>`: an accessible modal.
@@ -90,7 +90,7 @@ export class CaregridDialog extends LitElement {
       padding: 20px;
       overflow: auto;
     }
-    :host([data-mobile="true"]) .dialog__panel {
+    :host([data-mobile='true']) .dialog__panel {
       margin: 0;
       width: 100vw;
       max-height: 100vh;
@@ -118,42 +118,34 @@ export class CaregridDialog extends LitElement {
   constructor() {
     super();
     this.open = false;
-    this.label = "Dialog";
-    this.headingId = "";
-    this.size = "regular";
+    this.label = 'Dialog';
+    this.headingId = '';
+    this.size = 'regular';
   }
 
   private focusable(): HTMLElement[] {
     const shadow = this.shadowRoot
-      ? Array.from(
-          this.shadowRoot.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-        )
+      ? Array.from(this.shadowRoot.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
       : [];
-    const light = Array.from(
-      this.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-    );
+    const light = Array.from(this.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
     return [...shadow, ...light].filter(
-      (element) =>
-        element.offsetParent !== null || element === document.activeElement,
+      (element) => element.offsetParent !== null || element === document.activeElement,
     );
   }
 
   private focusFirst(): void {
     const items = this.focusable();
-    const target =
-      items[0] ?? this.shadowRoot?.querySelector<HTMLElement>(".dialog__panel");
+    const target = items[0] ?? this.shadowRoot?.querySelector<HTMLElement>('.dialog__panel');
     target?.focus();
   }
 
   override updated(changed: Map<string, unknown>): void {
-    if (!changed.has("open")) {
+    if (!changed.has('open')) {
       return;
     }
     if (this.open) {
       this.restoreFocus =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       window.requestAnimationFrame(() => this.focusFirst());
     } else {
       this.restoreFocus?.focus();
@@ -172,7 +164,7 @@ export class CaregridDialog extends LitElement {
   private requestClose(): void {
     this.open = false;
     this.dispatchEvent(
-      new CustomEvent("caregrid:dialog-close", {
+      new CustomEvent('caregrid:dialog-close', {
         bubbles: true,
         composed: true,
       }),
@@ -180,13 +172,13 @@ export class CaregridDialog extends LitElement {
   }
 
   private handleKeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
       this.requestClose();
       return;
     }
-    if (event.key !== "Tab") {
+    if (event.key !== 'Tab') {
       return;
     }
     const items = this.focusable();
@@ -212,7 +204,7 @@ export class CaregridDialog extends LitElement {
     return html`
       <div class="dialog__backdrop" aria-hidden="true"></div>
       <div
-        class="dialog__panel${this.size === "wide" ? " dialog__panel--wide" : ""}"
+        class="dialog__panel${this.size === 'wide' ? ' dialog__panel--wide' : ''}"
         role="dialog"
         aria-modal="true"
         aria-label=${this.headingId ? undefined : this.label}
@@ -222,13 +214,7 @@ export class CaregridDialog extends LitElement {
       >
         <header class="dialog__header">
           <p class="dialog__eyebrow">${this.label}</p>
-          <button
-            class="dialog__close"
-            type="button"
-            @click=${this.requestClose}
-          >
-            Close
-          </button>
+          <button class="dialog__close" type="button" @click=${this.requestClose}>Close</button>
         </header>
         <div class="dialog__body"><slot></slot></div>
       </div>
@@ -236,10 +222,10 @@ export class CaregridDialog extends LitElement {
   }
 }
 
-defineOnce("caregrid-dialog", CaregridDialog);
+defineOnce('caregrid-dialog', CaregridDialog);
 
 declare global {
   interface HTMLElementTagNameMap {
-    "caregrid-dialog": CaregridDialog;
+    'caregrid-dialog': CaregridDialog;
   }
 }
