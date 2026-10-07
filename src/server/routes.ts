@@ -533,7 +533,7 @@ function mapFollowUp(raw: unknown, extras: Json = {}): FollowUpView {
     id: str(record, 'id'),
     clientId: str(record, 'clientId'),
     appointmentId: nullableStr(record, 'appointmentId'),
-    assigneeId: str(record, 'assigneeId'),
+    assigneeId: nullableStr(record, 'assigneeId'),
     title: str(record, 'title'),
     dueDate: str(record, 'dueDate', 'due_date'),
     priority: followUpPriorityValue(str(record, 'priority') || str(extras, 'priority')),
