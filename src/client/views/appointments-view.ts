@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html } from 'lit';
 import {
   createAppointment,
   listAppointments,
@@ -6,19 +6,19 @@ import {
   listProviders,
   toApiError,
   updateAppointmentStatus,
-} from "../api.js";
-import { defineOnce } from "../lib/define.js";
-import { CaregridView } from "./view-base.js";
-import "../components/app-dialog.js";
-import "../components/state-panel.js";
-import "../components/status-badge.js";
+} from '../api.js';
+import { defineOnce } from '../lib/define.js';
+import { CaregridView } from './view-base.js';
+import '../components/app-dialog.js';
+import '../components/state-panel.js';
+import '../components/status-badge.js';
 import {
   formatDayLabel,
   formatDuration,
   formatTimeRange,
   pluralise,
   todayDateOnly,
-} from "../lib/format.js";
+} from '../lib/format.js';
 import {
   appointmentStatusDescription,
   appointmentStatusLabel,
@@ -27,33 +27,67 @@ import {
   deriveProviders,
   filterAppointments,
   sortAppointments,
-} from "../lib/status.js";
+} from '../lib/status.js';
 import {
   emptyAppointmentForm,
   errorSummary,
   mapServerFieldErrors,
   validateAppointmentForm,
-} from "../lib/validation.js";
-import type { FieldErrors } from "../lib/validation.js";
-import { APPOINTMENT_STATUSES } from "../types.js";
-import type {
-  Appointment,
-  AppointmentStatus,
-  Client,
-  LoadState,
-  Provider,
-} from "../types.js";
+} from '../lib/validation.js';
+import type { FieldErrors } from '../lib/validation.js';
+import { APPOINTMENT_TYPES } from '../../shared/constants.js';
+import type { AppointmentType } from '../../shared/constants.js';
+import { APPOINTMENT_STATUSES } from '../types.js';
+import type { Appointment, AppointmentStatus, Client, LoadState, Provider } from '../types.js';
 
-const APPOINTMENT_TYPES = [
-  "General check-up",
-  "Vaccination",
-  "Wound care",
-  "Chronic care review",
-  "Mental health support",
-  "Screening",
-  "Referral",
-  "Other",
-];
+/** Friendly labels for the API's appointment-type enum. */
+const APPOINTMENT_TYPE_LABELS: Record<AppointmentType, string> = {
+  intake: 'Intake',
+  check_in: 'Check-in',
+  follow_up: 'Follow-up',
+  screening: 'Screening',
+  other: 'Other',
+};
+
+/** New bookings open on a general check-in rather than the first enum value. */
+const DEFAULT_APPOINTMENT_TYPE: AppointmentType = 'check_in';
+
+/**
+ * Display labels earlier builds wrote into `type`. The API only accepts the
+ * enum values (`intake`, `check_in`, `follow_up`, `screening`, `other`), so any
+ * other value is repaired before it reaches the select or the POST body.
+ */
+const APPOINTMENT_TYPE_ALIASES: Record<string, AppointmentType> = {
+  'general check-up': 'check_in',
+  vaccination: 'other',
+  'wound care': 'other',
+  'chronic care review': 'follow_up',
+  'mental health support': 'follow_up',
+  referral: 'other',
+};
+
+function isAppointmentType(value: string): value is AppointmentType {
+  return (APPOINTMENT_TYPES as readonly string[]).includes(value);
+}
+
+/** Coerces any incoming `type`, including legacy display labels, to a valid API enum value. */
+function toAppointmentType(value: string): AppointmentType {
+  const normalised = value.trim().toLowerCase();
+  if (isAppointmentType(normalised)) {
+    return normalised;
+  }
+  return APPOINTMENT_TYPE_ALIASES[normalised] ?? DEFAULT_APPOINTMENT_TYPE;
+}
+
+/** Human-readable label for a stored appointment type, falling back to the raw value. */
+function appointmentTypeLabel(value: string): string {
+  const text = value.trim();
+  if (isAppointmentType(text)) {
+    return APPOINTMENT_TYPE_LABELS[text];
+  }
+  const alias = APPOINTMENT_TYPE_ALIASES[text.toLowerCase()];
+  return alias ? APPOINTMENT_TYPE_LABELS[alias] : text;
+}
 
 interface Filters {
   date: string;
@@ -111,21 +145,21 @@ export class CaregridAppointmentsView extends CaregridView {
 
   constructor() {
     super();
-    this.intent = "";
-    this.filters = { date: "", status: "", providerId: "" };
-    this.loadState = "idle";
-    this.errorMessage = "";
+    this.intent = '';
+    this.filters = { date: '', status: '', providerId: '' };
+    this.loadState = 'idle';
+    this.errorMessage = '';
     this.appointments = [];
     this.clients = [];
     this.providers = [];
-    this.statusMessage = "";
-    this.actionError = "";
-    this.busyAction = "";
+    this.statusMessage = '';
+    this.actionError = '';
+    this.busyAction = '';
     this.dialogOpen = false;
-    this.form = emptyAppointmentForm();
+    this.form = this.newAppointmentForm();
     this.formErrors = {};
-    this.formAlert = "";
-    this.formAlertDetail = "";
+    this.formAlert = '';
+    this.formAlertDetail = '';
     this.submitting = false;
   }
 
@@ -141,7 +175,7 @@ export class CaregridAppointmentsView extends CaregridView {
   }
 
   protected override willUpdate(changed: Map<string, unknown>): void {
-    if (changed.has("intent") && this.intent === "new" && !this.dialogOpen) {
+    if (changed.has('intent') && this.intent === 'new' && !this.dialogOpen) {
       this.openDialog();
     }
   }
@@ -150,8 +184,8 @@ export class CaregridAppointmentsView extends CaregridView {
     this.controller?.abort();
     const controller = new AbortController();
     this.controller = controller;
-    this.loadState = this.appointments.length === 0 ? "loading" : "ready";
-    this.errorMessage = "";
+    this.loadState = this.appointments.length === 0 ? 'loading' : 'ready';
+    this.errorMessage = '';
     try {
       const [appointments, clients, providers] = await Promise.all([
         listAppointments({
@@ -168,19 +202,15 @@ export class CaregridAppointmentsView extends CaregridView {
       }
       this.appointments = appointments;
       this.clients = clients;
-      this.providers =
-        providers.length > 0 ? providers : deriveProviders(appointments);
-      this.loadState = "ready";
+      this.providers = providers.length > 0 ? providers : deriveProviders(appointments);
+      this.loadState = 'ready';
       this.notifyRefreshed();
     } catch (error) {
       if (!this.isCurrent(controller.signal)) {
         return;
       }
-      this.errorMessage = this.describeFailure(
-        error,
-        "load the appointment list",
-      );
-      this.loadState = "error";
+      this.errorMessage = this.describeFailure(error, 'load the appointment list');
+      this.loadState = 'error';
     }
   }
 
@@ -195,28 +225,36 @@ export class CaregridAppointmentsView extends CaregridView {
   }
 
   private clearFilters(): void {
-    this.filters = { date: "", status: "", providerId: "" };
+    this.filters = { date: '', status: '', providerId: '' };
     void this.load();
   }
 
   private openDialog(): void {
-    this.form = emptyAppointmentForm(this.filters.date || todayDateOnly());
+    this.form = this.newAppointmentForm(this.filters.date || todayDateOnly());
     if (this.filters.providerId) {
       this.form = { ...this.form, providerId: this.filters.providerId };
     }
     this.formErrors = {};
-    this.formAlert = "";
-    this.formAlertDetail = "";
+    this.formAlert = '';
+    this.formAlertDetail = '';
     this.formSubmitted = false;
     this.dialogOpen = true;
   }
 
   private closeDialog(): void {
     this.dialogOpen = false;
-    this.formAlert = "";
-    this.formAlertDetail = "";
+    this.formAlert = '';
+    this.formAlertDetail = '';
     this.formErrors = {};
     this.formSubmitted = false;
+  }
+
+  /** Seeds a booking form whose `type` is always a value the API accepts. */
+  private newAppointmentForm(
+    date: string = todayDateOnly(),
+  ): ReturnType<typeof emptyAppointmentForm> {
+    const form = emptyAppointmentForm(date);
+    return { ...form, type: toAppointmentType(form.type) };
   }
 
   private updateForm<K extends keyof ReturnType<typeof emptyAppointmentForm>>(
@@ -232,8 +270,8 @@ export class CaregridAppointmentsView extends CaregridView {
   private async handleSubmit(event: Event): Promise<void> {
     event.preventDefault();
     this.formSubmitted = true;
-    this.formAlert = "";
-    this.formAlertDetail = "";
+    this.formAlert = '';
+    this.formAlertDetail = '';
     const result = validateAppointmentForm(this.form);
     this.formErrors = result.errors;
     if (!result.valid) {
@@ -256,29 +294,29 @@ export class CaregridAppointmentsView extends CaregridView {
       this.formErrors = {};
       this.formSubmitted = false;
       this.statusMessage = `Appointment booked for ${clientName} on ${formatDayLabel(this.form.date)} at ${formatTimeRange(this.form.startTime, this.form.endTime)}.`;
-      this.announce(this.statusMessage, "success");
-      this.form = emptyAppointmentForm(this.filters.date || todayDateOnly());
+      this.announce(this.statusMessage, 'success');
+      this.form = this.newAppointmentForm(this.filters.date || todayDateOnly());
       await this.load();
     } catch (error) {
-      const apiError = toApiError(error, "We could not book that appointment.");
+      const apiError = toApiError(error, 'We could not book that appointment.');
       const mapped = mapServerFieldErrors(apiError.fieldErrors, [
-        "clientId",
-        "providerId",
-        "date",
-        "startTime",
-        "endTime",
-        "type",
-        "reason",
+        'clientId',
+        'providerId',
+        'date',
+        'startTime',
+        'endTime',
+        'type',
+        'reason',
       ]);
       if (Object.keys(mapped).length > 0) {
         this.formErrors = { ...this.formErrors, ...mapped };
       }
       const clash = apiError.isSchedulingClash && !apiError.isValidation;
       this.formAlert = clash
-        ? "That slot could not be booked"
+        ? 'That slot could not be booked'
         : Object.keys(mapped).length > 0
           ? errorSummary(mapped)
-          : "That appointment could not be saved";
+          : 'That appointment could not be saved';
       this.formAlertDetail = apiError.message;
     } finally {
       this.submitting = false;
@@ -287,7 +325,7 @@ export class CaregridAppointmentsView extends CaregridView {
 
   private clientName(clientId: string): string {
     const client = this.clients.find((candidate) => candidate.id === clientId);
-    return client ? client.fullName : "this client";
+    return client ? client.fullName : 'this client';
   }
 
   private async handleStatusAction(
@@ -295,34 +333,27 @@ export class CaregridAppointmentsView extends CaregridView {
     status: AppointmentStatus,
   ): Promise<void> {
     const key = `${appointment.id}:${status}`;
-    if (this.busyAction !== "") {
+    if (this.busyAction !== '') {
       return;
     }
     this.busyAction = key;
-    this.actionError = "";
+    this.actionError = '';
     try {
       await updateAppointmentStatus(appointment.id, status);
       const label = appointmentStatusLabel(status);
       this.statusMessage = `${appointment.clientName} is now ${label.toLowerCase()}.`;
-      this.announce(
-        `${appointment.clientName}: ${label.toLowerCase()} recorded.`,
-        "success",
-      );
+      this.announce(`${appointment.clientName}: ${label.toLowerCase()} recorded.`, 'success');
       await this.load();
     } catch (error) {
-      this.actionError = this.describeFailure(error, "update that appointment");
+      this.actionError = this.describeFailure(error, 'update that appointment');
     } finally {
-      this.busyAction = "";
+      this.busyAction = '';
     }
   }
 
   private renderFilters() {
     return html`
-      <div
-        class="toolbar toolbar--filters"
-        role="search"
-        aria-label="Filter appointments"
-      >
+      <div class="toolbar toolbar--filters" role="search" aria-label="Filter appointments">
         <p class="field">
           <label class="field__label" for="appointment-filter-date">Date</label>
           <input
@@ -331,52 +362,40 @@ export class CaregridAppointmentsView extends CaregridView {
             type="date"
             data-testid="appointment-filter-date"
             .value=${this.filters.date}
-            @change=${(event: Event) => this.updateFilter("date", (event.target as HTMLInputElement).value)}
+            @change=${(event: Event) => this.updateFilter('date', (event.target as HTMLInputElement).value)}
           />
         </p>
         <p class="field">
-          <label class="field__label" for="appointment-filter-status"
-            >Status</label
-          >
+          <label class="field__label" for="appointment-filter-status">Status</label>
           <select
             class="input"
             id="appointment-filter-status"
             data-testid="appointment-filter-status"
             .value=${this.filters.status}
-            @change=${(event: Event) => this.updateFilter("status", (event.target as HTMLSelectElement).value)}
+            @change=${(event: Event) => this.updateFilter('status', (event.target as HTMLSelectElement).value)}
           >
             <option value="">All statuses</option>
             ${APPOINTMENT_STATUSES.map(
-              (status) =>
-                html`<option value=${status}>
-                  ${appointmentStatusLabel(status)}
-                </option>`,
+              (status) => html`<option value=${status}>${appointmentStatusLabel(status)}</option>`,
             )}
           </select>
         </p>
         <p class="field">
-          <label class="field__label" for="appointment-filter-provider"
-            >Provider</label
-          >
+          <label class="field__label" for="appointment-filter-provider">Provider</label>
           <select
             class="input"
             id="appointment-filter-provider"
             data-testid="appointment-filter-provider"
             .value=${this.filters.providerId}
-            @change=${(event: Event) => this.updateFilter("providerId", (event.target as HTMLSelectElement).value)}
+            @change=${(event: Event) => this.updateFilter('providerId', (event.target as HTMLSelectElement).value)}
           >
             <option value="">All providers</option>
             ${this.providers.map(
-              (provider) =>
-                html`<option value=${provider.id}>${provider.name}</option>`,
+              (provider) => html`<option value=${provider.id}>${provider.name}</option>`,
             )}
           </select>
         </p>
-        <button
-          class="button button--ghost"
-          type="button"
-          @click=${this.clearFilters}
-        >
+        <button class="button button--ghost" type="button" @click=${this.clearFilters}>
           Clear filters
         </button>
       </div>
@@ -384,7 +403,7 @@ export class CaregridAppointmentsView extends CaregridView {
   }
 
   private renderRows(appointments: Appointment[]) {
-    if (this.loadState === "loading" || this.loadState === "idle") {
+    if (this.loadState === 'loading' || this.loadState === 'idle') {
       return html`
         <caregrid-state-panel
           variant="loading"
@@ -394,7 +413,7 @@ export class CaregridAppointmentsView extends CaregridView {
         ></caregrid-state-panel>
       `;
     }
-    if (this.loadState === "error") {
+    if (this.loadState === 'error') {
       return html`
         <caregrid-state-panel
           variant="error"
@@ -408,17 +427,15 @@ export class CaregridAppointmentsView extends CaregridView {
     }
     if (appointments.length === 0) {
       const filtered =
-        this.filters.date !== "" ||
-        this.filters.status !== "" ||
-        this.filters.providerId !== "";
+        this.filters.date !== '' || this.filters.status !== '' || this.filters.providerId !== '';
       return html`
         <caregrid-state-panel
           variant="empty"
-          title=${filtered ? "No appointments match those filters" : "No appointments booked yet"}
+          title=${filtered ? 'No appointments match those filters' : 'No appointments booked yet'}
           message=${
             filtered
-              ? "Try another date, status or provider, or clear the filters to see the whole calendar."
-              : "Book the first visit for today from the New appointment button."
+              ? 'Try another date, status or provider, or clear the filters to see the whole calendar.'
+              : 'Book the first visit for today from the New appointment button.'
           }
           data-testid="appointments-empty"
         ></caregrid-state-panel>
@@ -444,9 +461,7 @@ export class CaregridAppointmentsView extends CaregridView {
           <p class="appointment-row__clock">
             ${formatTimeRange(appointment.startTime, appointment.endTime)}
           </p>
-          <p class="appointment-row__day">
-            ${formatDayLabel(appointment.date)}
-          </p>
+          <p class="appointment-row__day">${formatDayLabel(appointment.date)}</p>
           ${
             formatDuration(appointment.startTime, appointment.endTime)
               ? html`<p class="appointment-row__duration">
@@ -456,14 +471,16 @@ export class CaregridAppointmentsView extends CaregridView {
           }
         </div>
         <div class="appointment-row__body">
-          <p class="appointment-row__client">
-            ${appointment.clientName || "Client to confirm"}
-          </p>
+          <p class="appointment-row__client">${appointment.clientName || 'Client to confirm'}</p>
           <p class="appointment-row__meta">
             ${
-              [appointment.providerName, appointment.location, appointment.type]
-                .filter((part) => part.trim() !== "")
-                .join(" · ") || "No provider assigned"
+              [
+                appointment.providerName,
+                appointment.location,
+                appointmentTypeLabel(appointment.type),
+              ]
+                .filter((part) => part.trim() !== '')
+                .join(' · ') || 'No provider assigned'
             }
           </p>
           ${appointment.reason ? html`<p class="appointment-row__reason">${appointment.reason}</p>` : null}
@@ -486,10 +503,10 @@ export class CaregridAppointmentsView extends CaregridView {
                       type="button"
                       data-testid=${`appointment-action-${action.status}`}
                       title=${action.description}
-                      ?disabled=${this.busyAction !== ""}
+                      ?disabled=${this.busyAction !== ''}
                       @click=${() => this.handleStatusAction(appointment, action.status)}
                     >
-                      ${busy && this.busyAction.endsWith(`:${action.status}`) ? "Saving…" : action.label}
+                      ${busy && this.busyAction.endsWith(`:${action.status}`) ? 'Saving…' : action.label}
                     </button>
                   `,
                 )
@@ -515,28 +532,16 @@ export class CaregridAppointmentsView extends CaregridView {
         size="wide"
         @caregrid:dialog-close=${this.closeDialog}
       >
-        <h2 class="detail__title" id="appointment-dialog-heading">
-          New appointment
-        </h2>
+        <h2 class="detail__title" id="appointment-dialog-heading">New appointment</h2>
         <p class="muted">
-          Book a visit into an open slot. The clinic API checks clashes and
-          capacity.
+          Book a visit into an open slot. The clinic API checks clashes and capacity.
         </p>
-        <form
-          class="form"
-          data-testid="appointment-form"
-          novalidate
-          @submit=${this.handleSubmit}
-        >
+        <form class="form" data-testid="appointment-form" novalidate @submit=${this.handleSubmit}>
           <div class="alert-stack" aria-live="assertive">
             ${
               this.formAlert
                 ? html`
-                    <div
-                      class="alert alert--error"
-                      role="alert"
-                      data-testid="appointment-error"
-                    >
+                    <div class="alert alert--error" role="alert" data-testid="appointment-error">
                       <p class="alert__title">${this.formAlert}</p>
                       ${this.formAlertDetail ? html`<p class="alert__detail">${this.formAlertDetail}</p>` : null}
                     </div>
@@ -546,9 +551,7 @@ export class CaregridAppointmentsView extends CaregridView {
           </div>
           <div class="field-grid">
             <p class="field">
-              <label class="field__label" for="appointment-client"
-                >Client</label
-              >
+              <label class="field__label" for="appointment-client">Client</label>
               <select
                 class="input"
                 id="appointment-client"
@@ -556,36 +559,27 @@ export class CaregridAppointmentsView extends CaregridView {
                 required
                 ?disabled=${busy || noClients}
                 .value=${this.form.clientId}
-                aria-invalid=${errors.clientId ? "true" : "false"}
-                aria-describedby=${errors.clientId ? "appointment-client-error" : undefined}
-                @change=${(event: Event) => this.updateForm("clientId", (event.target as HTMLSelectElement).value)}
+                aria-invalid=${errors.clientId ? 'true' : 'false'}
+                aria-describedby=${errors.clientId ? 'appointment-client-error' : undefined}
+                @change=${(event: Event) => this.updateForm('clientId', (event.target as HTMLSelectElement).value)}
               >
                 <option value="">Select a client</option>
                 ${this.clients.map(
-                  (client) =>
-                    html`<option value=${client.id}>
-                      ${client.fullName}
-                    </option>`,
+                  (client) => html`<option value=${client.id}>${client.fullName}</option>`,
                 )}
               </select>
               ${
                 errors.clientId
-                  ? html`<span
-                      class="field__error"
-                      id="appointment-client-error"
+                  ? html`<span class="field__error" id="appointment-client-error"
                       >${errors.clientId}</span
                     >`
                   : noClients
-                    ? html`<span class="field__hint"
-                        >No clients yet — add a client first.</span
-                      >`
+                    ? html`<span class="field__hint">No clients yet — add a client first.</span>`
                     : null
               }
             </p>
             <p class="field">
-              <label class="field__label" for="appointment-provider"
-                >Provider</label
-              >
+              <label class="field__label" for="appointment-provider">Provider</label>
               <select
                 class="input"
                 id="appointment-provider"
@@ -593,23 +587,19 @@ export class CaregridAppointmentsView extends CaregridView {
                 required
                 ?disabled=${busy || noProviders}
                 .value=${this.form.providerId}
-                aria-invalid=${errors.providerId ? "true" : "false"}
-                aria-describedby=${errors.providerId ? "appointment-provider-error" : undefined}
-                @change=${(event: Event) => this.updateForm("providerId", (event.target as HTMLSelectElement).value)}
+                aria-invalid=${errors.providerId ? 'true' : 'false'}
+                aria-describedby=${errors.providerId ? 'appointment-provider-error' : undefined}
+                @change=${(event: Event) => this.updateForm('providerId', (event.target as HTMLSelectElement).value)}
               >
                 <option value="">Select a provider</option>
                 ${this.providers.map(
                   (provider) =>
-                    html`<option value=${provider.id}>
-                      ${providerOptionLabel(provider)}
-                    </option>`,
+                    html`<option value=${provider.id}>${providerOptionLabel(provider)}</option>`,
                 )}
               </select>
               ${
                 errors.providerId
-                  ? html`<span
-                      class="field__error"
-                      id="appointment-provider-error"
+                  ? html`<span class="field__error" id="appointment-provider-error"
                       >${errors.providerId}</span
                     >`
                   : noProviders
@@ -629,31 +619,44 @@ export class CaregridAppointmentsView extends CaregridView {
                 data-testid="appointment-date"
                 ?disabled=${busy}
                 .value=${this.form.date}
-                aria-invalid=${errors.date ? "true" : "false"}
-                aria-describedby=${errors.date ? "appointment-date-error" : undefined}
-                @change=${(event: Event) => this.updateForm("date", (event.target as HTMLInputElement).value)}
+                aria-invalid=${errors.date ? 'true' : 'false'}
+                aria-describedby=${errors.date ? 'appointment-date-error' : undefined}
+                @change=${(event: Event) => this.updateForm('date', (event.target as HTMLInputElement).value)}
               />
               ${errors.date ? html`<span class="field__error" id="appointment-date-error">${errors.date}</span>` : null}
             </p>
             <p class="field">
-              <label class="field__label" for="appointment-type"
-                >Appointment type</label
-              >
+              <label class="field__label" for="appointment-type">Appointment type</label>
               <select
                 class="input"
                 id="appointment-type"
                 data-testid="appointment-type"
                 ?disabled=${busy}
                 .value=${this.form.type}
-                @change=${(event: Event) => this.updateForm("type", (event.target as HTMLSelectElement).value)}
+                aria-invalid=${errors.type ? 'true' : 'false'}
+                aria-describedby=${errors.type ? 'appointment-type-error' : undefined}
+                @change=${(event: Event) => this.updateForm('type', (event.target as HTMLSelectElement).value)}
               >
-                ${APPOINTMENT_TYPES.map((type) => html`<option value=${type}>${type}</option>`)}
+                ${APPOINTMENT_TYPES.map(
+                  // Lit commits the select's `.value` before these nested option
+                  // templates exist, so bind `selected` too or the browser falls
+                  // back to the first option while the form state says otherwise.
+                  (type) =>
+                    html`<option value=${type} .selected=${type === this.form.type}>
+                      ${APPOINTMENT_TYPE_LABELS[type]}
+                    </option>`,
+                )}
               </select>
+              ${
+                errors.type
+                  ? html`<span class="field__error" id="appointment-type-error"
+                      >${errors.type}</span
+                    >`
+                  : null
+              }
             </p>
             <p class="field">
-              <label class="field__label" for="appointment-start"
-                >Start time</label
-              >
+              <label class="field__label" for="appointment-start">Start time</label>
               <input
                 class="input"
                 id="appointment-start"
@@ -662,9 +665,9 @@ export class CaregridAppointmentsView extends CaregridView {
                 data-testid="appointment-start"
                 ?disabled=${busy}
                 .value=${this.form.startTime}
-                aria-invalid=${errors.startTime ? "true" : "false"}
-                aria-describedby=${errors.startTime ? "appointment-start-error" : undefined}
-                @change=${(event: Event) => this.updateForm("startTime", (event.target as HTMLInputElement).value)}
+                aria-invalid=${errors.startTime ? 'true' : 'false'}
+                aria-describedby=${errors.startTime ? 'appointment-start-error' : undefined}
+                @change=${(event: Event) => this.updateForm('startTime', (event.target as HTMLInputElement).value)}
               />
               ${
                 errors.startTime
@@ -684,9 +687,9 @@ export class CaregridAppointmentsView extends CaregridView {
                 data-testid="appointment-end"
                 ?disabled=${busy}
                 .value=${this.form.endTime}
-                aria-invalid=${errors.endTime ? "true" : "false"}
-                aria-describedby=${errors.endTime ? "appointment-end-error" : undefined}
-                @change=${(event: Event) => this.updateForm("endTime", (event.target as HTMLInputElement).value)}
+                aria-invalid=${errors.endTime ? 'true' : 'false'}
+                aria-describedby=${errors.endTime ? 'appointment-end-error' : undefined}
+                @change=${(event: Event) => this.updateForm('endTime', (event.target as HTMLInputElement).value)}
               />
               ${
                 errors.endTime
@@ -697,9 +700,7 @@ export class CaregridAppointmentsView extends CaregridView {
               }
             </p>
             <p class="field field--wide">
-              <label class="field__label" for="appointment-reason"
-                >Reason for visit</label
-              >
+              <label class="field__label" for="appointment-reason">Reason for visit</label>
               <textarea
                 class="input input--textarea"
                 id="appointment-reason"
@@ -707,15 +708,13 @@ export class CaregridAppointmentsView extends CaregridView {
                 data-testid="appointment-reason"
                 ?disabled=${busy}
                 .value=${this.form.reason}
-                aria-invalid=${errors.reason ? "true" : "false"}
-                aria-describedby=${errors.reason ? "appointment-reason-error" : undefined}
-                @input=${(event: Event) => this.updateForm("reason", (event.target as HTMLTextAreaElement).value)}
+                aria-invalid=${errors.reason ? 'true' : 'false'}
+                aria-describedby=${errors.reason ? 'appointment-reason-error' : undefined}
+                @input=${(event: Event) => this.updateForm('reason', (event.target as HTMLTextAreaElement).value)}
               ></textarea>
               ${
                 errors.reason
-                  ? html`<span
-                      class="field__error"
-                      id="appointment-reason-error"
+                  ? html`<span class="field__error" id="appointment-reason-error"
                       >${errors.reason}</span
                     >`
                   : null
@@ -729,7 +728,7 @@ export class CaregridAppointmentsView extends CaregridView {
               data-testid="appointment-submit"
               ?disabled=${busy}
             >
-              ${busy ? "Booking…" : "Book appointment"}
+              ${busy ? 'Booking…' : 'Book appointment'}
             </button>
             <button
               class="button button--secondary"
@@ -746,19 +745,15 @@ export class CaregridAppointmentsView extends CaregridView {
   }
 
   override render() {
-    const visible = sortAppointments(
-      filterAppointments(this.appointments, this.filters),
-    );
+    const visible = sortAppointments(filterAppointments(this.appointments, this.filters));
     return html`
       <section class="view" aria-labelledby="appointments-heading">
         <header class="view__header">
           <div class="view__heading">
             <p class="view__eyebrow">Clinic desk</p>
-            <h1 class="view__title" id="appointments-heading" tabindex="-1">
-              Appointments
-            </h1>
+            <h1 class="view__title" id="appointments-heading" tabindex="-1">Appointments</h1>
             <p class="view__subtitle">
-              ${this.loadState === "ready" ? pluralise(visible.length, "appointment") : "Clinic calendar"}
+              ${this.loadState === 'ready' ? pluralise(visible.length, 'appointment') : 'Clinic calendar'}
             </p>
           </div>
           <div class="view__actions">
@@ -770,11 +765,7 @@ export class CaregridAppointmentsView extends CaregridView {
             >
               New appointment
             </button>
-            <button
-              class="button button--secondary"
-              type="button"
-              @click=${() => this.load()}
-            >
+            <button class="button button--secondary" type="button" @click=${() => this.load()}>
               Refresh list
             </button>
           </div>
@@ -796,9 +787,7 @@ export class CaregridAppointmentsView extends CaregridView {
             <h2 class="card__title" id="appointments-list-heading">Calendar</h2>
           </div>
           ${this.renderFilters()}
-          <div @caregrid:panel-action=${this.handlePanelAction}>
-            ${this.renderRows(visible)}
-          </div>
+          <div @caregrid:panel-action=${this.handlePanelAction}>${this.renderRows(visible)}</div>
         </section>
         ${this.renderDialog()}
       </section>
@@ -808,15 +797,15 @@ export class CaregridAppointmentsView extends CaregridView {
 
 function providerOptionLabel(provider: Provider): string {
   const extras = [provider.role, provider.specialty]
-    .filter((part) => part.trim() !== "")
-    .join(", ");
+    .filter((part) => part.trim() !== '')
+    .join(', ');
   return extras ? `${provider.name} (${extras})` : provider.name;
 }
 
-defineOnce("caregrid-appointments-view", CaregridAppointmentsView);
+defineOnce('caregrid-appointments-view', CaregridAppointmentsView);
 
 declare global {
   interface HTMLElementTagNameMap {
-    "caregrid-appointments-view": CaregridAppointmentsView;
+    'caregrid-appointments-view': CaregridAppointmentsView;
   }
 }
