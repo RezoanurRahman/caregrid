@@ -87,12 +87,26 @@ describe('read endpoints', () => {
     expect(dashboard.upcoming[0].clientName).toBe('Ada');
   });
 
-  it('only sends filters that were actually chosen', async () => {
+  it('maps the display-only scheduled filter onto the API requested status', async () => {
     const spy = mockFetch(() => respond({ appointments: [] }));
     await listAppointments({ date: '2026-10-07', status: 'scheduled' });
-    const empty = lastCall(spy);
-    expect(empty.url).toBe('/api/appointments?date=2026-10-07&status=scheduled');
+    expect(lastCall(spy).url).toBe('/api/appointments?date=2026-10-07&status=requested');
 
+    await listAppointments({ status: 'confirmed' });
+    expect(lastCall(spy).url).toBe('/api/appointments?status=confirmed');
+
+    await listAppointments({ status: 'no_show' });
+    expect(lastCall(spy).url).toBe('/api/appointments?status=no_show');
+  });
+
+  it('keeps normalising an API requested appointment onto the local scheduled label', async () => {
+    mockFetch(() => respond({ appointments: [{ id: 'apt-1', status: 'requested' }] }));
+    const appointments = await listAppointments({ status: 'scheduled' });
+    expect(appointments[0].status).toBe('scheduled');
+  });
+
+  it('only sends filters that were actually chosen', async () => {
+    const spy = mockFetch(() => respond({ appointments: [] }));
     await listAppointments({ date: '', status: '', providerId: 'prov-9' });
     expect(lastCall(spy).url).toBe('/api/appointments?providerId=prov-9');
   });
@@ -205,6 +219,16 @@ describe('write endpoints', () => {
     expect(followUp.status).toBe('done');
   });
 
+  it('maps a local scheduled status onto the API requested status when patching', async () => {
+    const spy = mockFetch(() => respond({ appointment: { id: 'apt-1', status: 'requested' } }));
+    const appointment = await updateAppointmentStatus('apt-1', 'scheduled');
+    const call = lastCall(spy);
+    expect(call.url).toBe('/api/appointments/apt-1');
+    expect(call.init.method).toBe('PATCH');
+    expect(JSON.parse(String(call.init.body))).toEqual({ status: 'requested' });
+    expect(appointment.status).toBe('scheduled');
+  });
+
   it('creates a follow-up and omits the appointment link when there is none', async () => {
     const spy = mockFetch(() =>
       respond({ followUp: { id: 'fu-3', title: 'Call back' } }, { status: 201 }),
@@ -303,6 +327,22 @@ describe('error handling', () => {
     expect(error.status).toBe(0);
     expect(error.isOffline).toBe(true);
     expect(error.message).toContain('could not reach the clinic API');
+  });
+
+  it('keeps mapped status requests on the same network and error contract', async () => {
+    mockFetch(() => respond({ message: 'Invalid appointment status' }, { status: 400 }));
+    const invalid = await rejection(listAppointments({ status: 'scheduled' }));
+    expect(invalid.isValidation).toBe(true);
+    expect(invalid.message).toBe('Invalid appointment status');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    const offline = await rejection(updateAppointmentStatus('apt-1', 'scheduled'));
+    expect(offline.isOffline).toBe(true);
   });
 
   it('wraps unknown throwables with a fallback message', () => {

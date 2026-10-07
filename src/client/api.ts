@@ -283,6 +283,18 @@ export async function createClient(input: NewClientInput, signal?: AbortSignal):
   return normalizeClient(unwrap(payload, 'client', 'data'));
 }
 
+/**
+ * The Lit views call the API's `requested` appointment status "scheduled" (see SPEC.md §3), but
+ * the HTTP contract only accepts `requested`. Translate the display-only value before it reaches
+ * a query string or PATCH body; every other status passes through untouched.
+ */
+function toApiAppointmentStatus(status: string | undefined): string | undefined {
+  if (status === undefined) {
+    return undefined;
+  }
+  return status.trim() === 'scheduled' ? 'requested' : status;
+}
+
 export async function listAppointments(
   options: {
     date?: string;
@@ -294,7 +306,7 @@ export async function listAppointments(
   const payload = await request(
     withQuery('/appointments', {
       date: options.date,
-      status: options.status,
+      status: toApiAppointmentStatus(options.status),
       providerId: options.providerId,
     }),
     withSignal({}, options.signal),
@@ -320,7 +332,10 @@ export async function updateAppointmentStatus(
 ): Promise<Appointment> {
   const payload = await request(
     `/appointments/${encodeURIComponent(id)}`,
-    withSignal({ method: 'PATCH', body: JSON.stringify({ status }) }, signal),
+    withSignal(
+      { method: 'PATCH', body: JSON.stringify({ status: toApiAppointmentStatus(status) }) },
+      signal,
+    ),
   );
   return normalizeAppointment(unwrap(payload, 'appointment', 'data'));
 }
