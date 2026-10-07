@@ -1,6 +1,6 @@
-import { html } from "lit";
-import { CaregridElement } from "../lib/element.js";
-import { defineOnce } from "../lib/define.js";
+import { html } from 'lit';
+import { CaregridElement } from '../lib/element.js';
+import { defineOnce } from '../lib/define.js';
 import {
   followUpDueText,
   followUpStatusLabel,
@@ -8,9 +8,9 @@ import {
   isFollowUpOverdue,
   priorityLabel,
   priorityTone,
-} from "../lib/status.js";
-import type { FollowUp } from "../types.js";
-import "./status-badge.js";
+} from '../lib/status.js';
+import type { FollowUp } from '../types.js';
+import './status-badge.js';
 
 /** Read-only follow-up row used by the Overview preview and the client detail. */
 export class CaregridFollowUpSummary extends CaregridElement {
@@ -28,7 +28,7 @@ export class CaregridFollowUpSummary extends CaregridElement {
     super();
     this.followUp = null;
     this.showClient = true;
-    this.today = "";
+    this.today = '';
   }
 
   override render() {
@@ -38,21 +38,21 @@ export class CaregridFollowUpSummary extends CaregridElement {
     }
     const overdue = isFollowUpOverdue(followUp, this.today || undefined);
     const meta = [
-      this.showClient ? followUp.clientName : "",
-      followUp.assignee ? `Owner: ${followUp.assignee}` : "",
+      this.showClient ? followUp.clientName : '',
+      followUp.assignee ? `Owner: ${followUp.assignee}` : '',
     ]
-      .filter((part) => part.trim() !== "")
-      .join(" · ");
+      .filter((part) => part.trim() !== '')
+      .join(' · ');
     return html`
       <div
-        class="summary-row summary-row--followup${overdue ? " is-overdue" : ""}"
+        class="summary-row summary-row--followup${overdue ? ' is-overdue' : ''}"
         role="listitem"
         data-testid=${`followup-summary-${followUp.id}`}
       >
         <div class="summary-row__body">
           <p class="summary-row__title">${followUp.title}</p>
           <p class="summary-row__meta">
-            <span class=${overdue ? "text-danger" : "muted"}>
+            <span class=${overdue ? 'text-danger' : 'muted'}>
               ${followUpDueText(followUp, this.today || undefined)}
             </span>
             ${meta ? html`<span class="muted"> · ${meta}</span>` : null}
@@ -75,10 +75,10 @@ export class CaregridFollowUpSummary extends CaregridElement {
   }
 }
 
-defineOnce("caregrid-followup-summary", CaregridFollowUpSummary);
+defineOnce('caregrid-followup-summary', CaregridFollowUpSummary);
 
 declare global {
   interface HTMLElementTagNameMap {
-    "caregrid-followup-summary": CaregridFollowUpSummary;
+    'caregrid-followup-summary': CaregridFollowUpSummary;
   }
 }

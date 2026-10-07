@@ -1,4 +1,4 @@
-import { LitElement } from "lit";
+import { LitElement } from 'lit';
 
 /**
  * Base class for every Caregrid element.

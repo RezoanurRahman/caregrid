@@ -6,26 +6,26 @@
  * that container exists and to `<body>` when it does not.
  */
 
-import "./styles.css";
-import { CaregridApp } from "./app.js";
-import { defineOnce } from "./lib/define.js";
+import './styles.css';
+import { CaregridApp } from './app.js';
+import { defineOnce } from './lib/define.js';
 
-defineOnce("caregrid-app", CaregridApp);
+defineOnce('caregrid-app', CaregridApp);
 
 function mount(): void {
-  const container = document.getElementById("app") ?? document.body;
-  const existing = document.querySelector("caregrid-app");
+  const container = document.getElementById('app') ?? document.body;
+  const existing = document.querySelector('caregrid-app');
   if (existing) {
     return;
   }
-  container.append(document.createElement("caregrid-app"));
-  if (document.title.trim() === "" || document.title === "Vite App") {
-    document.title = "Caregrid · community clinic desk";
+  container.append(document.createElement('caregrid-app'));
+  if (document.title.trim() === '' || document.title === 'Vite App') {
+    document.title = 'Caregrid · community clinic desk';
   }
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", mount, { once: true });
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', mount, { once: true });
 } else {
   mount();
 }

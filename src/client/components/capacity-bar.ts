@@ -1,7 +1,7 @@
-import { html } from "lit";
-import { CaregridElement } from "../lib/element.js";
-import { defineOnce } from "../lib/define.js";
-import { formatRatio, formatTimeRange } from "../lib/format.js";
+import { html } from 'lit';
+import { CaregridElement } from '../lib/element.js';
+import { defineOnce } from '../lib/define.js';
+import { formatRatio, formatTimeRange } from '../lib/format.js';
 
 /**
  * `<caregrid-capacity-bar>`: session capacity as a real progress bar.
@@ -28,12 +28,12 @@ export class CaregridCapacityBar extends CaregridElement {
 
   constructor() {
     super();
-    this.label = "";
+    this.label = '';
     this.booked = 0;
     this.capacity = 0;
-    this.startTime = "";
-    this.endTime = "";
-    this.meta = "";
+    this.startTime = '';
+    this.endTime = '';
+    this.meta = '';
   }
 
   private get fill(): number {
@@ -45,9 +45,9 @@ export class CaregridCapacityBar extends CaregridElement {
 
   private get tone(): string {
     if (this.capacity > 0 && this.booked >= this.capacity) {
-      return "full";
+      return 'full';
     }
-    return this.fill >= 80 ? "busy" : "open";
+    return this.fill >= 80 ? 'busy' : 'open';
   }
 
   override render() {
@@ -59,16 +59,16 @@ export class CaregridCapacityBar extends CaregridElement {
     return html`
       <div class="capacity-row" role="listitem">
         <div class="capacity-row__head">
-          <p class="capacity-row__label">${this.label || "Session"}</p>
+          <p class="capacity-row__label">${this.label || 'Session'}</p>
           <p class="capacity-row__numbers">${description}</p>
         </div>
         <div
           class="capacity-row__track"
           role="progressbar"
-          aria-label=${`${this.label || "Session"} capacity`}
+          aria-label=${`${this.label || 'Session'} capacity`}
           aria-valuemin="0"
-          aria-valuemax=${this.capacity > 0 ? String(this.capacity) : "0"}
-          aria-valuenow=${this.capacity > 0 ? String(this.booked) : "0"}
+          aria-valuemax=${this.capacity > 0 ? String(this.capacity) : '0'}
+          aria-valuenow=${this.capacity > 0 ? String(this.booked) : '0'}
           aria-valuetext=${description}
         >
           <span
@@ -79,7 +79,7 @@ export class CaregridCapacityBar extends CaregridElement {
         ${
           time || this.meta
             ? html`<p class="capacity-row__meta">
-                ${[time, this.meta].filter(Boolean).join(" · ")}
+                ${[time, this.meta].filter(Boolean).join(' · ')}
               </p>`
             : null
         }
@@ -88,10 +88,10 @@ export class CaregridCapacityBar extends CaregridElement {
   }
 }
 
-defineOnce("caregrid-capacity-bar", CaregridCapacityBar);
+defineOnce('caregrid-capacity-bar', CaregridCapacityBar);
 
 declare global {
   interface HTMLElementTagNameMap {
-    "caregrid-capacity-bar": CaregridCapacityBar;
+    'caregrid-capacity-bar': CaregridCapacityBar;
   }
 }

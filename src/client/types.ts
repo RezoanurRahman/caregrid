@@ -7,11 +7,11 @@
  * views, the API client and the unit tests all speak the same language.
  */
 
-export type ViewKey = "overview" | "appointments" | "clients" | "followups";
+export type ViewKey = 'overview' | 'appointments' | 'clients' | 'followups';
 
-export type LoadState = "idle" | "loading" | "ready" | "error";
+export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
-export type NoticeTone = "success" | "error" | "info";
+export type NoticeTone = 'success' | 'error' | 'info';
 
 export interface Notice {
   id: string;
@@ -20,28 +20,23 @@ export interface Notice {
 }
 
 export const APPOINTMENT_STATUSES = [
-  "scheduled",
-  "confirmed",
-  "checked_in",
-  "completed",
-  "no_show",
-  "cancelled",
+  'scheduled',
+  'confirmed',
+  'checked_in',
+  'completed',
+  'no_show',
+  'cancelled',
 ] as const;
 
 export type KnownAppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
-export type AppointmentStatus = KnownAppointmentStatus | "unknown";
+export type AppointmentStatus = KnownAppointmentStatus | 'unknown';
 
-export const FOLLOW_UP_STATUSES = [
-  "open",
-  "in_progress",
-  "done",
-  "cancelled",
-] as const;
+export const FOLLOW_UP_STATUSES = ['open', 'in_progress', 'done', 'cancelled'] as const;
 
 export type KnownFollowUpStatus = (typeof FOLLOW_UP_STATUSES)[number];
-export type FollowUpStatus = KnownFollowUpStatus | "unknown";
+export type FollowUpStatus = KnownFollowUpStatus | 'unknown';
 
-export type Priority = "high" | "medium" | "low" | "unknown";
+export type Priority = 'high' | 'medium' | 'low' | 'unknown';
 
 export interface Provider {
   id: string;
@@ -187,7 +182,7 @@ export interface NewFollowUpInput {
   detail?: string;
 }
 
-export type CsvKind = "clients" | "appointments";
+export type CsvKind = 'clients' | 'appointments';
 
 export interface CsvDownload {
   filename: string;
@@ -195,12 +190,6 @@ export interface CsvDownload {
   rowCount: number;
 }
 
-export const FOLLOW_UP_FILTERS = [
-  "all",
-  "open",
-  "in_progress",
-  "done",
-  "overdue",
-] as const;
+export const FOLLOW_UP_FILTERS = ['all', 'open', 'in_progress', 'done', 'overdue'] as const;
 
 export type FollowUpFilter = (typeof FOLLOW_UP_FILTERS)[number];

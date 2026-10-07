@@ -1,7 +1,7 @@
-import { html } from "lit";
-import { CaregridElement } from "../lib/element.js";
-import { defineOnce } from "../lib/define.js";
-import type { StatusTone } from "../lib/status.js";
+import { html } from 'lit';
+import { CaregridElement } from '../lib/element.js';
+import { defineOnce } from '../lib/define.js';
+import type { StatusTone } from '../lib/status.js';
 
 /** `<caregrid-metric-card>`: one headline number with a label and a supporting hint. */
 export class CaregridMetricCard extends CaregridElement {
@@ -19,10 +19,10 @@ export class CaregridMetricCard extends CaregridElement {
 
   constructor() {
     super();
-    this.label = "";
-    this.value = "0";
-    this.hint = "";
-    this.tone = "neutral";
+    this.label = '';
+    this.value = '0';
+    this.hint = '';
+    this.tone = 'neutral';
   }
 
   override render() {
@@ -36,10 +36,10 @@ export class CaregridMetricCard extends CaregridElement {
   }
 }
 
-defineOnce("caregrid-metric-card", CaregridMetricCard);
+defineOnce('caregrid-metric-card', CaregridMetricCard);
 
 declare global {
   interface HTMLElementTagNameMap {
-    "caregrid-metric-card": CaregridMetricCard;
+    'caregrid-metric-card': CaregridMetricCard;
   }
 }

@@ -1,12 +1,12 @@
-import { html } from "lit";
-import { CaregridElement } from "./lib/element.js";
-import { defineOnce } from "./lib/define.js";
-import { formatFullDate, todayDateOnly } from "./lib/format.js";
-import "./views/appointments-view.js";
-import "./views/clients-view.js";
-import "./views/followups-view.js";
-import "./views/overview-view.js";
-import type { Notice, NoticeTone, ViewKey } from "./types.js";
+import { html } from 'lit';
+import { CaregridElement } from './lib/element.js';
+import { defineOnce } from './lib/define.js';
+import { formatFullDate, todayDateOnly } from './lib/format.js';
+import './views/appointments-view.js';
+import './views/clients-view.js';
+import './views/followups-view.js';
+import './views/overview-view.js';
+import type { Notice, NoticeTone, ViewKey } from './types.js';
 
 interface NavItem {
   key: ViewKey;
@@ -17,28 +17,28 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    key: "overview",
-    label: "Overview",
-    testId: "nav-overview",
-    hint: "Today at a glance",
+    key: 'overview',
+    label: 'Overview',
+    testId: 'nav-overview',
+    hint: 'Today at a glance',
   },
   {
-    key: "appointments",
-    label: "Appointments",
-    testId: "nav-appointments",
-    hint: "Calendar and visit status",
+    key: 'appointments',
+    label: 'Appointments',
+    testId: 'nav-appointments',
+    hint: 'Calendar and visit status',
   },
   {
-    key: "clients",
-    label: "Clients",
-    testId: "nav-clients",
-    hint: "Roster, intake and records",
+    key: 'clients',
+    label: 'Clients',
+    testId: 'nav-clients',
+    hint: 'Roster, intake and records',
   },
   {
-    key: "followups",
-    label: "Follow-ups",
-    testId: "nav-followups",
-    hint: "Work owed to clients",
+    key: 'followups',
+    label: 'Follow-ups',
+    testId: 'nav-followups',
+    hint: 'Work owed to clients',
   },
 ];
 
@@ -79,13 +79,13 @@ export class CaregridApp extends CaregridElement {
 
   constructor() {
     super();
-    this.view = "overview";
-    this.intent = "";
+    this.view = 'overview';
+    this.intent = '';
     this.context = {
-      clinicName: "Caregrid Community Clinic",
-      site: "",
+      clinicName: 'Caregrid Community Clinic',
+      site: '',
       date: todayDateOnly(),
-      updatedAt: "",
+      updatedAt: '',
     };
     this.notices = [];
   }
@@ -99,42 +99,38 @@ export class CaregridApp extends CaregridElement {
   }
 
   override updated(changed: Map<string, unknown>): void {
-    if (changed.has("view") && this.navigated) {
+    if (changed.has('view') && this.navigated) {
       window.requestAnimationFrame(() => {
-        const heading = this.querySelector<HTMLElement>("main h1");
+        const heading = this.querySelector<HTMLElement>('main h1');
         heading?.focus();
       });
     }
   }
 
-  private go(view: ViewKey, intent = ""): void {
+  private go(view: ViewKey, intent = ''): void {
     this.navigated = true;
     this.view = view;
     this.intent = intent;
-    document.title = `${NAV_ITEMS.find((item) => item.key === view)?.label ?? "Overview"} · Caregrid`;
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.title = `${NAV_ITEMS.find((item) => item.key === view)?.label ?? 'Overview'} · Caregrid`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  private handleNavigate(
-    event: CustomEvent<{ view?: ViewKey; intent?: string }>,
-  ): void {
+  private handleNavigate(event: CustomEvent<{ view?: ViewKey; intent?: string }>): void {
     event.stopPropagation();
     const view = event.detail?.view;
     if (!view || !NAV_ITEMS.some((item) => item.key === view)) {
       return;
     }
-    this.go(view, event.detail?.intent ?? "");
+    this.go(view, event.detail?.intent ?? '');
   }
 
-  private handleAnnounce(
-    event: CustomEvent<{ message?: string; tone?: NoticeTone }>,
-  ): void {
+  private handleAnnounce(event: CustomEvent<{ message?: string; tone?: NoticeTone }>): void {
     event.stopPropagation();
-    const message = (event.detail?.message ?? "").trim();
-    if (message === "") {
+    const message = (event.detail?.message ?? '').trim();
+    if (message === '') {
       return;
     }
-    this.pushNotice(message, event.detail?.tone ?? "success");
+    this.pushNotice(message, event.detail?.tone ?? 'success');
   }
 
   private handleContext(event: CustomEvent<Record<string, string>>): void {
@@ -153,26 +149,21 @@ export class CaregridApp extends CaregridElement {
     const now = new Date();
     this.context = {
       ...this.context,
-      updatedAt: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+      updatedAt: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
     };
   }
 
   private pushNotice(message: string, tone: NoticeTone): void {
     this.noticeSeq += 1;
     const id = `notice-${this.noticeSeq}`;
-    const notices = [...this.notices, { id, message, tone }].slice(
-      -NOTICE_LIMIT,
-    );
+    const notices = [...this.notices, { id, message, tone }].slice(-NOTICE_LIMIT);
     for (const stale of this.notices) {
       if (!notices.some((notice) => notice.id === stale.id)) {
         this.clearNoticeTimer(stale.id);
       }
     }
     this.notices = notices;
-    const timer = window.setTimeout(
-      () => this.dismissNotice(id),
-      NOTICE_TIMEOUT_MS,
-    );
+    const timer = window.setTimeout(() => this.dismissNotice(id), NOTICE_TIMEOUT_MS);
     this.noticeTimers.set(id, timer);
   }
 
@@ -195,10 +186,10 @@ export class CaregridApp extends CaregridElement {
         ${NAV_ITEMS.map(
           (item) => html`
             <button
-              class="nav__button${this.view === item.key ? " is-active" : ""}"
+              class="nav__button${this.view === item.key ? ' is-active' : ''}"
               type="button"
               data-testid=${item.testId}
-              aria-current=${this.view === item.key ? "page" : "false"}
+              aria-current=${this.view === item.key ? 'page' : 'false'}
               title=${item.hint}
               @click=${() => this.go(item.key)}
             >
@@ -212,18 +203,16 @@ export class CaregridApp extends CaregridElement {
 
   private renderContextLine() {
     const parts = [this.context.site, formatFullDate(this.context.date)].filter(
-      (part) => part.trim() !== "",
+      (part) => part.trim() !== '',
     );
     return html`
       <p class="context-line">
         <span class="context-line__clinic">${this.context.clinicName}</span>
         <span class="context-line__sep" aria-hidden="true">·</span>
-        <span class="context-line__part">${parts.join(" · ")}</span>
+        <span class="context-line__part">${parts.join(' · ')}</span>
         ${
           this.context.updatedAt
-            ? html`<span class="context-line__updated"
-                >Updated ${this.context.updatedAt}</span
-              >`
+            ? html`<span class="context-line__updated">Updated ${this.context.updatedAt}</span>`
             : null
         }
       </p>
@@ -232,15 +221,13 @@ export class CaregridApp extends CaregridElement {
 
   private renderView() {
     switch (this.view) {
-      case "appointments":
+      case 'appointments':
         return html`<caregrid-appointments-view
           .intent=${this.intent}
         ></caregrid-appointments-view>`;
-      case "clients":
-        return html`<caregrid-clients-view
-          .intent=${this.intent}
-        ></caregrid-clients-view>`;
-      case "followups":
+      case 'clients':
+        return html`<caregrid-clients-view .intent=${this.intent}></caregrid-clients-view>`;
+      case 'followups':
         return html`<caregrid-followups-view></caregrid-followups-view>`;
       default:
         return html`<caregrid-overview-view></caregrid-overview-view>`;
@@ -260,12 +247,7 @@ export class CaregridApp extends CaregridElement {
         <header class="app-header">
           <div class="app-header__bar">
             <p class="wordmark">
-              <svg
-                class="wordmark__mark"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                focusable="false"
-              >
+              <svg class="wordmark__mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <rect x="9" y="2" width="6" height="20" rx="2"></rect>
                 <rect x="2" y="9" width="20" height="6" rx="2"></rect>
               </svg>
@@ -276,22 +258,15 @@ export class CaregridApp extends CaregridElement {
           </div>
           ${this.renderContextLine()}
         </header>
-        <main class="app-main" id="main-content" tabindex="-1">
-          ${this.renderView()}
-        </main>
+        <main class="app-main" id="main-content" tabindex="-1">${this.renderView()}</main>
         <footer class="app-footer">
           <p>
-            Caregrid runs locally: client records, appointments and follow-ups
-            are stored on this machine and served from the
+            Caregrid runs locally: client records, appointments and follow-ups are stored on this
+            machine and served from the
             <code>/api</code> endpoints.
           </p>
         </footer>
-        <div
-          class="toast-region"
-          role="status"
-          aria-live="polite"
-          data-testid="toast-region"
-        >
+        <div class="toast-region" role="status" aria-live="polite" data-testid="toast-region">
           ${this.notices.map(
             (notice) => html`
               <div class="toast toast--${notice.tone}" data-testid="toast">
@@ -314,9 +289,9 @@ export class CaregridApp extends CaregridElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "caregrid-app": CaregridApp;
+    'caregrid-app': CaregridApp;
   }
 }
 
 // Both registrations are idempotent, so importing this module twice is safe.
-defineOnce("caregrid-app", CaregridApp);
+defineOnce('caregrid-app', CaregridApp);

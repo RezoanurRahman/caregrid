@@ -1,7 +1,7 @@
-import { html } from "lit";
-import { CaregridElement } from "../lib/element.js";
-import { defineOnce } from "../lib/define.js";
-import type { StatusTone } from "../lib/status.js";
+import { html } from 'lit';
+import { CaregridElement } from '../lib/element.js';
+import { defineOnce } from '../lib/define.js';
+import type { StatusTone } from '../lib/status.js';
 
 /**
  * `<caregrid-status-badge label="Confirmed" tone="success" detail="…">`
@@ -24,14 +24,14 @@ export class CaregridStatusBadge extends CaregridElement {
 
   constructor() {
     super();
-    this.label = "";
-    this.tone = "neutral";
-    this.detail = "";
-    this.size = "regular";
+    this.label = '';
+    this.tone = 'neutral';
+    this.detail = '';
+    this.size = 'regular';
   }
 
   override render() {
-    const className = `badge badge--${this.tone}${this.size === "small" ? " badge--small" : ""}`;
+    const className = `badge badge--${this.tone}${this.size === 'small' ? ' badge--small' : ''}`;
     return html`
       <span class=${className} title=${this.detail || undefined}>
         <span class="badge__dot" aria-hidden="true"></span>
@@ -41,10 +41,10 @@ export class CaregridStatusBadge extends CaregridElement {
   }
 }
 
-defineOnce("caregrid-status-badge", CaregridStatusBadge);
+defineOnce('caregrid-status-badge', CaregridStatusBadge);
 
 declare global {
   interface HTMLElementTagNameMap {
-    "caregrid-status-badge": CaregridStatusBadge;
+    'caregrid-status-badge': CaregridStatusBadge;
   }
 }
