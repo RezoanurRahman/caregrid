@@ -1,0 +1,9 @@
+{
+  "name": "Caregrid",
+  "slug": "caregrid",
+  "summary": "Caregrid is a local-first coordination desk for pop-up community health clinics, connecting client intake, conflict-aware appointments, follow-up work, and auditable outcomes in one calm workspace.",
+  "frontend": "Lit 3 + Vite",
+  "backend": "Fastify 5",
+  "storage": "sqlite",
+  "language": "typescript"
+}
