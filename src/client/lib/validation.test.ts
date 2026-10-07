@@ -31,14 +31,37 @@ describe('client intake validation', () => {
     expect(result.errors.lastName).toBe('Last name is required.');
   });
 
-  it('requires at least one way to reach the client', () => {
+  it('requires a phone number', () => {
     const result = validateClientForm({
       ...emptyClientForm(),
       firstName: 'Ada',
-      lastName: 'L',
+      lastName: 'Lovelace',
     });
     expect(result.valid).toBe(false);
-    expect(result.errors.phone).toContain('phone number or an email');
+    expect(result.errors.phone).toBe('Phone number is required.');
+  });
+
+  it('rejects an email only client', () => {
+    const result = validateClientForm({
+      ...emptyClientForm(),
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email: 'ada@example.org',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.phone).toBe('Phone number is required.');
+    expect(result.errors.email).toBeUndefined();
+  });
+
+  it('accepts a phone only client because email is optional', () => {
+    const result = validateClientForm({
+      ...emptyClientForm(),
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      phone: '(555) 010-0199',
+    });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual({});
   });
 
   it('rejects malformed contact details', () => {
@@ -53,29 +76,51 @@ describe('client intake validation', () => {
     expect(result.errors.phone).toContain('at least 7 digits');
   });
 
-  it('accepts an email only intake and enforces the name length boundary', () => {
-    expect(
-      validateClientForm({
-        ...emptyClientForm(),
-        firstName: 'Ada',
-        lastName: 'L',
-        email: 'a@b.co',
-      }).valid,
-    ).toBe(true);
+  it('enforces the phone digit boundary at seven digits', () => {
+    const tooFew = validateClientForm({
+      ...emptyClientForm(),
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      phone: '555-010',
+    });
+    expect(tooFew.valid).toBe(false);
+    expect(tooFew.errors.phone).toBe('Enter a phone number with at least 7 digits.');
+
+    const boundary = validateClientForm({
+      ...emptyClientForm(),
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      phone: '5550100',
+    });
+    expect(boundary.valid).toBe(true);
+  });
+
+  it('enforces the name and phone length boundaries', () => {
     const boundary = validateClientForm({
       ...emptyClientForm(),
       firstName: 'a'.repeat(80),
       lastName: 'L',
-      email: 'a@b.co',
+      phone: '1'.repeat(40),
     });
     expect(boundary.valid).toBe(true);
     const tooLong = validateClientForm({
       ...emptyClientForm(),
       firstName: 'a'.repeat(81),
       lastName: 'L',
-      email: 'a@b.co',
+      phone: '1'.repeat(40),
     });
     expect(tooLong.errors.firstName).toContain('80 characters');
+    const longPhone = validateClientForm({
+      ...emptyClientForm(),
+      firstName: 'Ada',
+      lastName: 'L',
+      phone: '1'.repeat(41),
+    });
+    expect(longPhone.errors.phone).toContain('40 characters');
+  });
+
+  it('starts intake with consent unchecked so it is an explicit action', () => {
+    expect(emptyClientForm().consentGranted).toBe(false);
   });
 });
 

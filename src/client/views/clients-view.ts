@@ -548,8 +548,8 @@ export class CaregridClientsView extends CaregridView {
       >
         <h2 class="detail__title" id="client-dialog-heading">Add a client</h2>
         <p class="muted">
-          Record the details the clinic needs to coordinate care. Only the client's name is
-          required.
+          Record the details the clinic needs to coordinate care. Name and phone are required; email
+          is optional.
         </p>
         <form class="form" data-testid="client-form" novalidate @submit=${this.handleSubmit}>
           ${
@@ -609,13 +609,14 @@ export class CaregridClientsView extends CaregridView {
               }
             </p>
             <p class="field">
-              <label class="field__label" for="client-phone">Phone</label>
+              <label class="field__label" for="client-phone">Phone (required)</label>
               <input
                 class="input"
                 id="client-phone"
                 name="phone"
                 type="tel"
                 autocomplete="tel"
+                required
                 placeholder="555 0100"
                 data-testid="client-phone"
                 .value=${this.form.phone}
@@ -627,7 +628,7 @@ export class CaregridClientsView extends CaregridView {
                 errors.phone
                   ? html`<span class="field__error" id="client-phone-error">${errors.phone}</span>`
                   : html`<span class="field__hint" id="client-phone-hint"
-                      >Include an area code where possible.</span
+                      >Required. Include an area code where possible.</span
                     >`
               }
             </p>

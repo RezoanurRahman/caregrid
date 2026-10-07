@@ -1,11 +1,13 @@
 /**
  * Client side validation for the three clinic forms.
  *
- * The rules mirror the API contract: required fields, sane lengths, well formed email/phone and a
- * positive appointment duration. They are pure functions so the unit tests can cover the success,
- * boundary and failure cases without a browser.
+ * The rules mirror the API contract: a name and a reachable phone for client intake, optional
+ * email that is validated when supplied, sane lengths and a positive appointment duration. They
+ * are pure functions so the unit tests can cover the success, boundary and failure cases without
+ * a browser.
  */
 
+import { MAX_PHONE_LENGTH } from '../../shared/constants.js';
 import { todayDateOnly } from './format.js';
 
 export type FieldErrors = Record<string, string>;
@@ -20,6 +22,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK_PATTERN = /^\d{1,2}:\d{2}$/;
 const NAME_MAX = 80;
 const TITLE_MAX = 120;
+const PHONE_MIN_DIGITS = 7;
 
 export interface ClientFormValues {
   firstName: string;
@@ -58,7 +61,7 @@ export function emptyClientForm(): ClientFormValues {
     phone: '',
     email: '',
     preferredContact: 'phone',
-    consentGranted: true,
+    consentGranted: false,
     notes: '',
   };
 }
@@ -117,11 +120,11 @@ export function validateClientForm(values: ClientFormValues): ValidationResult {
     errors.email = 'Enter an email address such as name@example.org.';
   }
   const phone = values.phone.trim();
-  if (phone !== '' && phone.replace(/\D/g, '').length < 7) {
-    errors.phone = 'Enter a phone number with at least 7 digits.';
-  }
-  if (phone === '' && email === '') {
-    errors.phone = 'Add a phone number or an email so the clinic can reach this client.';
+  required(values.phone, 'Phone number', errors, 'phone');
+  if (phone !== '' && phone.replace(/\D/g, '').length < PHONE_MIN_DIGITS) {
+    errors.phone = `Enter a phone number with at least ${PHONE_MIN_DIGITS} digits.`;
+  } else if (phone !== '') {
+    maxLength(values.phone, MAX_PHONE_LENGTH, 'Phone number', errors, 'phone');
   }
   return { valid: Object.keys(errors).length === 0, errors };
 }
