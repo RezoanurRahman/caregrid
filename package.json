@@ -23,7 +23,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "test": "vitest run --dir tests/unit --passWithNoTests",
+    "test": "vitest run tests/unit src/client --passWithNoTests",
     "test:watch": "vitest --dir tests/unit",
     "test:integration": "vitest run --dir tests/integration --passWithNoTests",
     "test:e2e": "cross-env CAREGRID_TODAY=2026-10-07 playwright test",
