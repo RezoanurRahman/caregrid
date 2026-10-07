@@ -23,25 +23,20 @@ import {
   CLIENT_CONSENT_STATUSES,
   FOLLOW_UP_PRIORITIES,
   FOLLOW_UP_STATUSES,
-  MAX_ACCESS_NOTES_LENGTH,
-  MAX_NAME_LENGTH,
-  MAX_NOTES_LENGTH,
-  MAX_REASON_LENGTH,
-  MAX_TITLE_LENGTH,
   PROVIDER_ROLES,
 } from '../shared/constants.js';
 import {
+  PREFERRED_CONTACTS,
   appointmentStatusPatchSchema,
+  appointmentListQuerySchema,
   clientImportSchema,
   clientListQuerySchema,
-  emailSchema,
+  createAppointmentSchema,
+  createClientSchema,
+  createFollowUpSchema,
   followUpListQuerySchema,
   followUpStatusPatchSchema,
-  appointmentListQuerySchema,
-  isoDateSchema,
-  isoTimeSchema,
   nonBlankIdSchema,
-  phoneSchema,
   searchQuerySchema,
   sessionListQuerySchema,
 } from '../shared/schemas.js';
@@ -80,13 +75,6 @@ const UNKNOWN_DATE_OF_BIRTH = '1900-01-01';
 
 /** Visible placeholder for a client that has no phone number on file. */
 const UNKNOWN_PHONE = 'not provided';
-
-/**
- * Contact channels accepted by `POST /api/clients` and persisted in the client
- * record's extras. Kept local so the stored value stays a closed set without
- * widening the shared contract.
- */
-const PREFERRED_CONTACTS = ['phone', 'sms', 'email', 'letter', 'in_person'] as const;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -590,57 +578,6 @@ function parse<T extends z.ZodTypeAny>(schema: T, value: unknown, label: string)
   return result.data as z.infer<T>;
 }
 
-function textField(label: string, max: number) {
-  return z
-    .string()
-    .trim()
-    .min(1, `${label} is required`)
-    .max(max, `${label} must be ${max} characters or fewer`);
-}
-
-function optionalTextField(label: string, max: number) {
-  return z.string().trim().max(max, `${label} must be ${max} characters or fewer`).optional();
-}
-
-const clientCreateSchema = z.object({
-  firstName: z.string().trim().min(1, 'First name is required').max(MAX_NAME_LENGTH).optional(),
-  lastName: z.string().trim().min(1, 'Last name is required').max(MAX_NAME_LENGTH).optional(),
-  fullName: optionalTextField('Full name', MAX_NAME_LENGTH),
-  preferredName: optionalTextField('Preferred name', MAX_NAME_LENGTH),
-  preferredContact: z.enum(PREFERRED_CONTACTS).optional(),
-  phone: phoneSchema,
-  email: z.union([emailSchema, z.literal('')]).optional(),
-  dateOfBirth: isoDateSchema.optional(),
-  accessNotes: optionalTextField('Access notes', MAX_ACCESS_NOTES_LENGTH),
-  notes: optionalTextField('Notes', MAX_ACCESS_NOTES_LENGTH),
-  consentStatus: z.enum(CLIENT_CONSENT_STATUSES).optional(),
-  consentGranted: z.boolean().optional(),
-  status: z.enum(['active', 'archived', 'waitlist']).optional(),
-});
-
-const appointmentCreateSchema = z.object({
-  clientId: nonBlankIdSchema,
-  providerId: nonBlankIdSchema,
-  date: isoDateSchema,
-  startTime: isoTimeSchema,
-  endTime: isoTimeSchema,
-  type: z.enum(APPOINTMENT_TYPES).optional(),
-  reason: optionalTextField('Reason', MAX_REASON_LENGTH),
-  notes: optionalTextField('Notes', MAX_NOTES_LENGTH),
-});
-
-const followUpCreateSchema = z.object({
-  clientId: nonBlankIdSchema,
-  title: textField('Title', MAX_TITLE_LENGTH),
-  dueDate: isoDateSchema.optional(),
-  assigneeId: nonBlankIdSchema.optional(),
-  assignee: optionalTextField('Assignee', MAX_NAME_LENGTH),
-  appointmentId: nonBlankIdSchema.optional(),
-  priority: z.enum(FOLLOW_UP_PRIORITIES).optional(),
-  notes: optionalTextField('Notes', MAX_NOTES_LENGTH),
-  detail: optionalTextField('Notes', MAX_NOTES_LENGTH),
-});
-
 const clientQuerySchema = clientListQuerySchema.extend({
   search: searchQuerySchema,
   status: z.enum(['active', 'archived', 'waitlist']).optional(),
@@ -840,9 +777,9 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
   });
 
   app.post('/api/clients', async (request: FastifyRequest, reply: FastifyReply) => {
-    const body = parse(clientCreateSchema, request.body, 'Client payload');
+    const body = parse(createClientSchema, request.body, 'Client payload');
     const name = [body.firstName ?? '', body.lastName ?? ''].filter(Boolean).join(' ').trim();
-    const fullName = name !== '' ? name : (body.fullName ?? '');
+    const fullName = name !== '' ? name : body.fullName;
     if (fullName === '') {
       throw new ApiError('VALIDATION', 'Client payload is invalid.', {
         issues: [{ path: 'lastName', message: 'Last name is required' }],
@@ -850,20 +787,20 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
     }
     const input: StoreClientInput = {
       fullName,
-      email: body.email === undefined || body.email === '' ? null : body.email,
+      email: body.email,
       phone: body.phone,
       dateOfBirth: body.dateOfBirth ?? UNKNOWN_DATE_OF_BIRTH,
-      status: storeClientStatus(body.status ?? 'active') as StoreClientInput['status'],
-      notes: body.accessNotes ?? body.notes ?? '',
+      status: storeClientStatus(body.status) as StoreClientInput['status'],
+      notes: body.accessNotes !== '' ? body.accessNotes : body.notes,
     };
     const created = asRecord(store.createClient(input) as unknown);
     const id = str(created, 'id');
     const consent = body.consentStatus ?? (body.consentGranted === true ? 'granted' : undefined);
     extras.set('client', id, {
       ...(consent === undefined ? {} : { consentStatus: consent }),
-      ...(body.preferredName === undefined ? {} : { preferredName: body.preferredName }),
+      ...(body.preferredName === '' ? {} : { preferredName: body.preferredName }),
       ...(body.dateOfBirth === undefined ? {} : { dateOfBirth: body.dateOfBirth }),
-      preferredContact: body.preferredContact ?? 'phone',
+      preferredContact: body.preferredContact,
     });
     reply.code(201).header('location', `/api/clients/${id}`);
     return reply.send(mapClient(created, extras.get('client', id)));
@@ -919,12 +856,7 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
   };
 
   app.post('/api/appointments', async (request: FastifyRequest, reply: FastifyReply) => {
-    const body = parse(appointmentCreateSchema, request.body, 'Appointment payload');
-    if (body.endTime <= body.startTime) {
-      throw new ApiError('VALIDATION', 'Appointment payload is invalid.', {
-        issues: [{ path: 'endTime', message: 'endTime must be later than startTime' }],
-      });
-    }
+    const body = parse(createAppointmentSchema, request.body, 'Appointment payload');
     const session = findSessionFor(body.date, body.startTime, body.endTime);
     if (session === undefined) {
       throw new ApiError(
@@ -946,12 +878,12 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
       startTime: body.startTime,
       endTime: body.endTime,
       status: 'requested',
-      reason: body.reason ?? '',
-      notes: body.notes ?? '',
+      reason: body.reason,
+      notes: body.notes,
     };
     const created = asRecord(store.createAppointment(input) as unknown);
     const id = str(created, 'id');
-    extras.set('appointment', id, { type: body.type ?? 'other' });
+    extras.set('appointment', id, { type: body.type });
     reply.code(201).header('location', `/api/appointments/${id}`);
     return reply.send(mapAppointment(created, extras.get('appointment', id), sessionsById()));
   });
@@ -1002,7 +934,7 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
   });
 
   const createFollowUp = async (request: FastifyRequest, reply: FastifyReply) => {
-    const body = parse(followUpCreateSchema, request.body, 'Follow-up payload');
+    const body = parse(createFollowUpSchema, request.body, 'Follow-up payload');
     const assigneeId = body.assigneeId ?? resolveAssigneeId(store, body.assignee) ?? undefined;
     const input: StoreFollowUpInput = {
       clientId: body.clientId,
@@ -1010,12 +942,12 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
       dueDate: body.dueDate ?? addDays(todayIso(), 7),
       assigneeId: assigneeId ?? null,
       appointmentId: body.appointmentId ?? null,
-      detail: body.notes ?? body.detail ?? '',
+      detail: body.notes !== '' ? body.notes : body.detail,
       status: 'open',
     };
     const created = asRecord(store.createFollowUp(input) as unknown);
     const id = str(created, 'id');
-    extras.set('follow_up', id, { priority: body.priority ?? 'normal' });
+    extras.set('follow_up', id, { priority: body.priority });
     reply.code(201).header('location', `/api/follow-ups/${id}`);
     return reply.send(mapFollowUp(created, extras.get('follow_up', id)));
   };

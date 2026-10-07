@@ -1,12 +1,12 @@
 /**
  * Caregrid request and query schemas.
  *
- * These schemas validate JSON payloads at the API boundary: Fastify routes parse
- * the query, status, import and list schemas directly, and the Lit client can
- * reuse the create schemas for pre-flight form checks. The shipped routes stay
- * authoritative for rejection (for example `POST /api/clients` additionally
- * requires a reachable phone), so this module describes what the public API
- * accepts without loosening the server's own route-local validation.
+ * These schemas are the single contract for JSON payloads at the API boundary:
+ * the Fastify routes parse the create, import, status and query schemas
+ * directly, and the Lit client can reuse the create schemas for pre-flight form
+ * checks. The create schemas mirror the shipped handlers exactly — for example
+ * `POST /api/clients` requires a phone while bulk import rows keep it optional
+ * — so the server and client cannot drift apart.
  *
  * Conflict rules that need storage state (duplicate clients, capacity overflow,
  * invalid status transitions) deliberately live outside this module.
@@ -136,11 +136,18 @@ export const booleanQuerySchema = z.preprocess((value) => {
 // Client create + import
 // ---------------------------------------------------------------------------
 
+/** Contact channels a client can be reached through. */
+export const PREFERRED_CONTACTS = ['phone', 'sms', 'email', 'letter', 'in_person'] as const;
+export type PreferredContact = (typeof PREFERRED_CONTACTS)[number];
+
+/** Preferred contact channel; an absent value defaults to `phone`. */
+export const preferredContactSchema = z.enum(PREFERRED_CONTACTS).default('phone');
+
 /**
- * Client contact, consent and status fields shared by single-client creation
- * and bulk import. Absent contact details are normalized (`phone`,
- * `preferredName` and `accessNotes` to `''`, `email` to `null`) so downstream
- * code never has to handle `undefined`.
+ * Client contact, consent and status fields accepted by bulk import rows.
+ * Absent contact details are normalized (`phone`, `preferredName` and
+ * `accessNotes` to `''`, `email` to `null`) so downstream code never has to
+ * handle `undefined`.
  */
 const clientProfileFields = {
   preferredName: optionalText(MAX_NAME_LENGTH, 'Preferred name'),
@@ -155,17 +162,26 @@ const clientProfileFields = {
  * `POST /api/clients` payload. Accepts the canonical `firstName`/`lastName`
  * pair or the legacy `fullName` compatibility form, plus optional contact,
  * access, consent and status fields. `firstName` + `lastName` win over
- * `fullName` at the route, and the route additionally requires a phone.
+ * `fullName` at the route, and the single-client endpoint requires a phone.
+ * `consentStatus` stays optional (rather than defaulting here) so the route
+ * can still honor the legacy `consentGranted` boolean before falling back to
+ * `pending` on read.
  */
 export const createClientSchema = z
   .object({
     firstName: requiredText(MAX_NAME_LENGTH, 'First name').optional(),
     lastName: requiredText(MAX_NAME_LENGTH, 'Last name').optional(),
     fullName: optionalText(MAX_NAME_LENGTH, 'Full name'),
-    dateOfBirth: z.preprocess(emptyToUndefined, isoDateSchema.optional()),
+    preferredName: optionalText(MAX_NAME_LENGTH, 'Preferred name'),
+    phone: phoneSchema,
+    email: optionalEmailSchema,
+    preferredContact: preferredContactSchema,
+    dateOfBirth: isoDateSchema.optional(),
+    accessNotes: optionalText(MAX_ACCESS_NOTES_LENGTH, 'Access notes'),
     notes: optionalText(MAX_ACCESS_NOTES_LENGTH, 'Notes'),
+    consentStatus: z.enum(CLIENT_CONSENT_STATUSES).optional(),
     consentGranted: z.boolean().optional(),
-    ...clientProfileFields,
+    status: z.enum(CLIENT_STATUSES).default('active'),
   })
   .refine(
     (value) =>
