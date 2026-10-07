@@ -129,15 +129,17 @@ export const FOLLOW_UP_TRANSITIONS: Record<FollowUpStatus, readonly FollowUpStat
   dismissed: [],
 };
 
-export const TERMINAL_APPOINTMENT_STATUSES: readonly AppointmentStatus[] = APPOINTMENT_STATUSES.filter(
-  (status) => APPOINTMENT_TRANSITIONS[status].length === 0,
-);
+export const TERMINAL_APPOINTMENT_STATUSES: readonly AppointmentStatus[] =
+  APPOINTMENT_STATUSES.filter((status) => APPOINTMENT_TRANSITIONS[status].length === 0);
 
 export const TERMINAL_FOLLOW_UP_STATUSES: readonly FollowUpStatus[] = FOLLOW_UP_STATUSES.filter(
   (status) => FOLLOW_UP_TRANSITIONS[status].length === 0,
 );
 
-export function isValidAppointmentTransition(from: AppointmentStatus, to: AppointmentStatus): boolean {
+export function isValidAppointmentTransition(
+  from: AppointmentStatus,
+  to: AppointmentStatus,
+): boolean {
   const allowed = APPOINTMENT_TRANSITIONS[from];
   return allowed !== undefined && allowed.includes(to);
 }
@@ -378,7 +380,10 @@ export function parseTimeToMinutesOrNull(value: string): number | null {
 export function parseTimeToMinutes(value: string, field = 'time'): number {
   const minutes = typeof value === 'string' ? parseTimeToMinutesOrNull(value) : null;
   if (minutes === null) {
-    throw new StoreError('VALIDATION', `${field} must be a valid time of the form HH:MM.`, { field, value });
+    throw new StoreError('VALIDATION', `${field} must be a valid time of the form HH:MM.`, {
+      field,
+      value,
+    });
   }
   return minutes;
 }
@@ -392,12 +397,19 @@ export function normalizeTime(value: string, field = 'time'): string {
 
 export function assertIsoDate(value: unknown, field: string): string {
   if (!isIsoDate(value)) {
-    throw new StoreError('VALIDATION', `${field} must be a valid ISO date (YYYY-MM-DD).`, { field, value });
+    throw new StoreError('VALIDATION', `${field} must be a valid ISO date (YYYY-MM-DD).`, {
+      field,
+      value,
+    });
   }
   return value;
 }
 
-export function assertText(value: unknown, field: string, options: { maxLength?: number } = {}): string {
+export function assertText(
+  value: unknown,
+  field: string,
+  options: { maxLength?: number } = {},
+): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new StoreError('VALIDATION', `${field} is required.`, { field });
   }
@@ -414,7 +426,11 @@ export function assertText(value: unknown, field: string, options: { maxLength?:
 }
 
 /** Trims, requires content and collapses internal whitespace runs to a single space. */
-export function cleanWhitespace(value: unknown, field: string, options: { maxLength?: number } = {}): string {
+export function cleanWhitespace(
+  value: unknown,
+  field: string,
+  options: { maxLength?: number } = {},
+): string {
   return assertText(value, field, options).replace(/\s+/g, ' ');
 }
 
@@ -489,7 +505,10 @@ export function assertOneOf<T extends string>(
 
 export function assertPositiveInteger(value: unknown, field: string): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-    throw new StoreError('VALIDATION', `${field} must be a positive whole number.`, { field, value });
+    throw new StoreError('VALIDATION', `${field} must be a positive whole number.`, {
+      field,
+      value,
+    });
   }
   return value;
 }
@@ -545,8 +564,14 @@ export function assertAppointmentWindow(window: AppointmentWindow, session: Sess
 
   const start = parseTimeToMinutes(startTime, 'startTime');
   const end = parseTimeToMinutes(endTime, 'endTime');
-  const sessionStart = parseTimeToMinutes(normalizeTime(session.startTime, 'session.startTime'), 'session.startTime');
-  const sessionEnd = parseTimeToMinutes(normalizeTime(session.endTime, 'session.endTime'), 'session.endTime');
+  const sessionStart = parseTimeToMinutes(
+    normalizeTime(session.startTime, 'session.startTime'),
+    'session.startTime',
+  );
+  const sessionEnd = parseTimeToMinutes(
+    normalizeTime(session.endTime, 'session.endTime'),
+    'session.endTime',
+  );
 
   if (end <= start) {
     throw new StoreError('VALIDATION', 'Appointment end time must be after the start time.', {
@@ -571,7 +596,9 @@ export function assertAppointmentWindow(window: AppointmentWindow, session: Sess
   }
 }
 
-export function countBookedCapacity(appointments: readonly { status: AppointmentStatus }[]): number {
+export function countBookedCapacity(
+  appointments: readonly { status: AppointmentStatus }[],
+): number {
   return appointments.filter((appointment) => isCapacityConsuming(appointment.status)).length;
 }
 
@@ -613,18 +640,16 @@ export function resolveToday(
   return toIsoDate(now);
 }
 
-export function isOverdueFollowUp(
-  dueDate: string,
-  status: FollowUpStatus,
-  today: string,
-): boolean {
+export function isOverdueFollowUp(dueDate: string, status: FollowUpStatus, today: string): boolean {
   return isOpenFollowUpStatus(status) && dueDate < today;
 }
 
 export function addMinutes(isoTimestamp: string, minutes: number): string {
   const ms = Date.parse(isoTimestamp);
   if (Number.isNaN(ms)) {
-    throw new StoreError('VALIDATION', 'isoTimestamp must be a valid ISO timestamp.', { isoTimestamp });
+    throw new StoreError('VALIDATION', 'isoTimestamp must be a valid ISO timestamp.', {
+      isoTimestamp,
+    });
   }
   return new Date(ms + minutes * 60_000).toISOString();
 }
@@ -664,7 +689,10 @@ export function describeAppointmentStatusChange(
   return `Appointment for ${appointment.clientName} with ${appointment.providerName} on ${appointmentWindowLabel(appointment)} moved from ${APPOINTMENT_STATUS_LABELS[from]} to ${APPOINTMENT_STATUS_LABELS[to]}.`;
 }
 
-export function describeClientCreated(client: { fullName: string }, source: 'manual' | 'import' = 'manual'): string {
+export function describeClientCreated(
+  client: { fullName: string },
+  source: 'manual' | 'import' = 'manual',
+): string {
   return source === 'import'
     ? `Client ${client.fullName} added by CSV import.`
     : `Client ${client.fullName} added to the roster.`;

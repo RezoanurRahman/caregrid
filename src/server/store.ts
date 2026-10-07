@@ -363,7 +363,8 @@ class SqliteStore implements Store {
   /* ----------------------------------------------------------------- sessions */
 
   listSessions(date?: string): ClinicSession[] {
-    const filterDate = date === undefined || date === null || date === '' ? null : assertIsoDate(date, 'date');
+    const filterDate =
+      date === undefined || date === null || date === '' ? null : assertIsoDate(date, 'date');
     const rows = this.stmt(
       `${SESSION_SELECT} WHERE (:date IS NULL OR s.date = :date) ORDER BY s.date, s.start_time`,
     ).all({ date: filterDate }) as SessionRow[];
@@ -373,10 +374,14 @@ class SqliteStore implements Store {
   /* ------------------------------------------------------------------ clients */
 
   listClients(query: ListClientQuery = {}): Client[] {
-    const status = query.status === undefined ? null : assertOneOf(query.status, CLIENT_STATUSES, 'status');
-    const search = query.search === undefined || query.search.trim() === '' ? null : query.search.trim();
+    const status =
+      query.status === undefined ? null : assertOneOf(query.status, CLIENT_STATUSES, 'status');
+    const search =
+      query.search === undefined || query.search.trim() === '' ? null : query.search.trim();
     if (search !== null && search.length > 120) {
-      throw new StoreError('VALIDATION', 'search must be at most 120 characters.', { field: 'search' });
+      throw new StoreError('VALIDATION', 'search must be at most 120 characters.', {
+        field: 'search',
+      });
     }
     const rows = this.db
       .prepare(
@@ -395,14 +400,16 @@ class SqliteStore implements Store {
 
   getClientDetail(id: string): ClientDetail {
     const clientId = assertText(id, 'clientId', { maxLength: 64 });
-    const row = this.db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId) as ClientRow | undefined;
+    const row = this.db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId) as
+      ClientRow | undefined;
     if (row === undefined) {
       throw new StoreError('NOT_FOUND', `Client ${clientId} was not found.`, { clientId });
     }
     const today = resolveToday();
     const appointments = (
-      this.stmt(`${APPOINTMENT_SELECT} WHERE a.client_id = :clientId ORDER BY a.date DESC, a.start_time DESC`)
-        .all({ clientId }) as AppointmentRow[]
+      this.stmt(
+        `${APPOINTMENT_SELECT} WHERE a.client_id = :clientId ORDER BY a.date DESC, a.start_time DESC`,
+      ).all({ clientId }) as AppointmentRow[]
     ).map(mapAppointment);
     const followUps = (
       this.stmt(
@@ -467,7 +474,11 @@ class SqliteStore implements Store {
           email,
         });
       }
-      return this.insertClient({ fullName, email, phone, dateOfBirth, status, notes }, 'manual', nowIso());
+      return this.insertClient(
+        { fullName, email, phone, dateOfBirth, status, notes },
+        'manual',
+        nowIso(),
+      );
     });
     return create.immediate();
   }
@@ -477,9 +488,13 @@ class SqliteStore implements Store {
   listAppointments(filters: ListAppointmentFilters = {}): Appointment[] {
     const date = filters.date === undefined ? null : assertIsoDate(filters.date, 'date');
     const status =
-      filters.status === undefined ? null : assertOneOf(filters.status, APPOINTMENT_STATUSES, 'status');
+      filters.status === undefined
+        ? null
+        : assertOneOf(filters.status, APPOINTMENT_STATUSES, 'status');
     const providerId =
-      filters.providerId === undefined ? null : assertText(filters.providerId, 'providerId', { maxLength: 64 });
+      filters.providerId === undefined
+        ? null
+        : assertText(filters.providerId, 'providerId', { maxLength: 64 });
     const rows = this.stmt(
       `${APPOINTMENT_SELECT}
         WHERE (:date IS NULL OR a.date = :date)
@@ -493,7 +508,11 @@ class SqliteStore implements Store {
   createAppointment(input: CreateAppointmentInput): Appointment {
     const startTime = normalizeTime(String(input?.startTime ?? ''), 'startTime');
     const endTime = normalizeTime(String(input?.endTime ?? ''), 'endTime');
-    const status = assertOneOf(input?.status ?? 'requested', ['requested', 'confirmed'] as const, 'status');
+    const status = assertOneOf(
+      input?.status ?? 'requested',
+      ['requested', 'confirmed'] as const,
+      'status',
+    );
     const reason = optionalText(input?.reason, 'reason', { maxLength: 200 });
     const notes = optionalText(input?.notes, 'notes', { maxLength: 1000 });
     const clientId = assertText(input?.clientId, 'clientId', { maxLength: 64 });
@@ -517,10 +536,14 @@ class SqliteStore implements Store {
       }
       const provider = this.requireProvider(providerId);
       if (provider.active !== 1) {
-        throw new StoreError('VALIDATION', `Provider ${provider.name} is inactive and cannot take new appointments.`, {
-          field: 'providerId',
-          providerId,
-        });
+        throw new StoreError(
+          'VALIDATION',
+          `Provider ${provider.name} is inactive and cannot take new appointments.`,
+          {
+            field: 'providerId',
+            providerId,
+          },
+        );
       }
 
       const sessionAppointments = this.db
@@ -528,12 +551,16 @@ class SqliteStore implements Store {
         .all(sessionId) as { status: AppointmentStatus }[];
       const available = countAvailableCapacity(session, sessionAppointments);
       if (available <= 0) {
-        throw new StoreError('CONFLICT', `Session ${sessionId} is full (${session.capacity} slots booked).`, {
-          field: 'sessionId',
-          sessionId,
-          capacity: session.capacity,
-          booked: session.capacity - available,
-        });
+        throw new StoreError(
+          'CONFLICT',
+          `Session ${sessionId} is full (${session.capacity} slots booked).`,
+          {
+            field: 'sessionId',
+            sessionId,
+            capacity: session.capacity,
+            booked: session.capacity - available,
+          },
+        );
       }
 
       const conflicts = this.findBlockingConflicts({
@@ -550,12 +577,16 @@ class SqliteStore implements Store {
               `${conflict.kind} ${conflict.name} is booked ${conflict.startTime}-${conflict.endTime}`,
           )
           .join('; ');
-        throw new StoreError('CONFLICT', `Time slot overlaps an existing booking: ${description}.`, {
-          date: session.date,
-          startTime,
-          endTime,
-          conflicts,
-        });
+        throw new StoreError(
+          'CONFLICT',
+          `Time slot overlaps an existing booking: ${description}.`,
+          {
+            date: session.date,
+            startTime,
+            endTime,
+            conflicts,
+          },
+        );
       }
 
       const id = this.nextId('apt', 'appointments');
@@ -651,9 +682,14 @@ class SqliteStore implements Store {
   /* ---------------------------------------------------------------- follow-ups */
 
   listFollowUps(filters: ListFollowUpFilters = {}): FollowUp[] {
-    const status = filters.status === undefined ? null : assertOneOf(filters.status, FOLLOW_UP_STATUSES, 'status');
+    const status =
+      filters.status === undefined
+        ? null
+        : assertOneOf(filters.status, FOLLOW_UP_STATUSES, 'status');
     const assigneeId =
-      filters.assigneeId === undefined ? null : assertText(filters.assigneeId, 'assigneeId', { maxLength: 64 });
+      filters.assigneeId === undefined
+        ? null
+        : assertText(filters.assigneeId, 'assigneeId', { maxLength: 64 });
     // Tri-state: undefined means "any", true means "only overdue", false means "only not overdue".
     const overdue = filters.overdue === undefined ? null : filters.overdue ? 1 : 0;
     const today = resolveToday();
@@ -707,7 +743,12 @@ class SqliteStore implements Store {
           throw new StoreError(
             'VALIDATION',
             `Appointment ${appointmentId} belongs to a different client than ${clientId}.`,
-            { field: 'appointmentId', appointmentId, clientId, appointmentClientId: appointment.clientId },
+            {
+              field: 'appointmentId',
+              appointmentId,
+              clientId,
+              appointmentClientId: appointment.clientId,
+            },
           );
         }
       }
@@ -737,7 +778,11 @@ class SqliteStore implements Store {
         entityId: id,
         clientId,
         action: 'created',
-        detail: describeFollowUpCreated({ title, dueDate, status }, { fullName: client.full_name }, assigneeName),
+        detail: describeFollowUpCreated(
+          { title, dueDate, status },
+          { fullName: client.full_name },
+          assigneeName,
+        ),
         createdAt: timestamp,
       });
       return this.requireFollowUp(id);
@@ -758,7 +803,9 @@ class SqliteStore implements Store {
             followUpId,
             from: existing.status,
             to: nextStatus,
-            allowed: FOLLOW_UP_STATUSES.filter((candidate) => isValidFollowUpTransition(existing.status, candidate)),
+            allowed: FOLLOW_UP_STATUSES.filter((candidate) =>
+              isValidFollowUpTransition(existing.status, candidate),
+            ),
           },
         );
       }
@@ -855,7 +902,9 @@ class SqliteStore implements Store {
     const overdueFollowUps = openFollowUps.filter((followUp) => followUp.overdue);
 
     const sessions = (
-      this.stmt(`${SESSION_SELECT} WHERE s.date >= :today ORDER BY s.date, s.start_time LIMIT 20`).all({
+      this.stmt(
+        `${SESSION_SELECT} WHERE s.date >= :today ORDER BY s.date, s.start_time LIMIT 20`,
+      ).all({
         today,
       }) as SessionRow[]
     ).map(mapSession);
@@ -970,10 +1019,14 @@ class SqliteStore implements Store {
 
   importClients(input: ImportClientsInput): ImportClientsResult {
     if (input === null || typeof input !== 'object' || !Array.isArray(input.clients)) {
-      throw new StoreError('VALIDATION', 'clients must be an array of client rows.', { field: 'clients' });
+      throw new StoreError('VALIDATION', 'clients must be an array of client rows.', {
+        field: 'clients',
+      });
     }
     if (input.clients.length === 0) {
-      throw new StoreError('VALIDATION', 'clients must contain at least one row.', { field: 'clients' });
+      throw new StoreError('VALIDATION', 'clients must contain at least one row.', {
+        field: 'clients',
+      });
     }
     const mode: ImportMode = assertOneOf(input.mode ?? 'skip', ['skip', 'fail'] as const, 'mode');
 
@@ -1001,13 +1054,17 @@ class SqliteStore implements Store {
 
     const importRows = this.db.transaction((): ImportClientsResult => {
       const knownEmails = new Set<string>();
-      for (const row of this.db.prepare('SELECT email FROM clients WHERE email IS NOT NULL').all() as {
+      for (const row of this.db
+        .prepare('SELECT email FROM clients WHERE email IS NOT NULL')
+        .all() as {
         email: string;
       }[]) {
         knownEmails.add(normalizeEmail(row.email));
       }
       const knownNames = new Set<string>();
-      for (const row of this.db.prepare('SELECT full_name FROM clients').all() as { full_name: string }[]) {
+      for (const row of this.db.prepare('SELECT full_name FROM clients').all() as {
+        full_name: string;
+      }[]) {
         knownNames.add(normalizeName(row.full_name));
       }
 
@@ -1019,7 +1076,8 @@ class SqliteStore implements Store {
         const duplicateEmail = row.email !== null && knownEmails.has(row.email);
         const duplicateName = knownNames.has(normalizedName);
         if (duplicateEmail || duplicateName) {
-          const reason = duplicateEmail && duplicateName ? 'email and name' : duplicateEmail ? 'email' : 'name';
+          const reason =
+            duplicateEmail && duplicateName ? 'email and name' : duplicateEmail ? 'email' : 'name';
           if (mode === 'fail') {
             throw new StoreError(
               'CONFLICT',
@@ -1063,7 +1121,9 @@ class SqliteStore implements Store {
   }
 
   private nextId(prefix: string, table: 'clients' | 'appointments' | 'follow_ups'): string {
-    const rows = this.db.prepare(`SELECT id FROM ${table} WHERE id LIKE ?`).all(`${prefix}-%`) as { id: string }[];
+    const rows = this.db.prepare(`SELECT id FROM ${table} WHERE id LIKE ?`).all(`${prefix}-%`) as {
+      id: string;
+    }[];
     let max = 0;
     for (const row of rows) {
       const parsed = Number.parseInt(row.id.slice(prefix.length + 1), 10);
@@ -1073,11 +1133,13 @@ class SqliteStore implements Store {
   }
 
   private findClientByEmail(email: string): ClientRow | undefined {
-    return this.db.prepare('SELECT * FROM clients WHERE email = ?').get(email) as ClientRow | undefined;
+    return this.db.prepare('SELECT * FROM clients WHERE email = ?').get(email) as
+      ClientRow | undefined;
   }
 
   private requireClient(id: string): ClientRow {
-    const row = this.db.prepare('SELECT * FROM clients WHERE id = ?').get(id) as ClientRow | undefined;
+    const row = this.db.prepare('SELECT * FROM clients WHERE id = ?').get(id) as
+      ClientRow | undefined;
     if (row === undefined) {
       throw new StoreError('NOT_FOUND', `Client ${id} was not found.`, { clientId: id });
     }
@@ -1085,7 +1147,8 @@ class SqliteStore implements Store {
   }
 
   private requireProvider(id: string): ProviderRow {
-    const row = this.db.prepare('SELECT * FROM providers WHERE id = ?').get(id) as ProviderRow | undefined;
+    const row = this.db.prepare('SELECT * FROM providers WHERE id = ?').get(id) as
+      ProviderRow | undefined;
     if (row === undefined) {
       throw new StoreError('NOT_FOUND', `Provider ${id} was not found.`, { providerId: id });
     }
@@ -1093,7 +1156,8 @@ class SqliteStore implements Store {
   }
 
   private requireSession(id: string): SessionRow {
-    const row = this.stmt(`${SESSION_SELECT} WHERE s.id = :id`).get({ id }) as SessionRow | undefined;
+    const row = this.stmt(`${SESSION_SELECT} WHERE s.id = :id`).get({ id }) as
+      SessionRow | undefined;
     if (row === undefined) {
       throw new StoreError('NOT_FOUND', `Clinic session ${id} was not found.`, { sessionId: id });
     }
@@ -1101,7 +1165,8 @@ class SqliteStore implements Store {
   }
 
   private requireAppointment(id: string): Appointment {
-    const row = this.stmt(`${APPOINTMENT_SELECT} WHERE a.id = :id`).get({ id }) as AppointmentRow | undefined;
+    const row = this.stmt(`${APPOINTMENT_SELECT} WHERE a.id = :id`).get({ id }) as
+      AppointmentRow | undefined;
     if (row === undefined) {
       throw new StoreError('NOT_FOUND', `Appointment ${id} was not found.`, { appointmentId: id });
     }
@@ -1109,7 +1174,8 @@ class SqliteStore implements Store {
   }
 
   private requireFollowUp(id: string): FollowUp {
-    const row = this.stmt(`${FOLLOW_UP_SELECT} WHERE f.id = :id`).get({ id }) as FollowUpRow | undefined;
+    const row = this.stmt(`${FOLLOW_UP_SELECT} WHERE f.id = :id`).get({ id }) as
+      FollowUpRow | undefined;
     if (row === undefined) {
       throw new StoreError('NOT_FOUND', `Follow-up ${id} was not found.`, { followUpId: id });
     }
@@ -1138,10 +1204,14 @@ class SqliteStore implements Store {
         .run({ id, ...input, createdAt: timestamp, updatedAt: timestamp });
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new StoreError('CONFLICT', `A client with the email ${input.email ?? id} already exists.`, {
-          field: 'email',
-          email: input.email,
-        });
+        throw new StoreError(
+          'CONFLICT',
+          `A client with the email ${input.email ?? id} already exists.`,
+          {
+            field: 'email',
+            email: input.email,
+          },
+        );
       }
       throw error;
     }
@@ -1179,7 +1249,13 @@ class SqliteStore implements Store {
     endTime: string;
     clientId: string;
     providerId: string;
-  }): { kind: 'client' | 'provider'; id: string; name: string; startTime: string; endTime: string }[] {
+  }): {
+    kind: 'client' | 'provider';
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+  }[] {
     const rows = this.db
       .prepare(
         `SELECT a.id, a.client_id, a.provider_id, a.start_time, a.end_time,
