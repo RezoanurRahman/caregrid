@@ -343,6 +343,69 @@ describe('POST /api/clients', () => {
     expect(detail.client.firstName).toBe('Ada');
     expect(detail.client.lastName).toBe(lastName);
   });
+
+  it('persists the preferred contact and consent status through search and detail reads', async () => {
+    const app = await makeApp();
+    const lastName = unique('Preferred');
+    const res = await post(app, '/api/clients', {
+      firstName: 'Nora',
+      lastName,
+      phone: '555-0142',
+      email: `${lastName.toLowerCase()}@example.test`,
+      preferredContact: 'in_person',
+      consentStatus: 'declined',
+    });
+    expect(res.statusCode).toBe(201);
+    const created = json<Client>(res);
+    expect(created.id).toBeTruthy();
+    expect(res.headers['location']).toBe(`/api/clients/${created.id}`);
+    expect(created.preferredContact).toBe('in_person');
+    expect(created.consentStatus).toBe('declined');
+
+    const { body: found } = await get<Client[]>(
+      app,
+      `/api/clients?search=${encodeURIComponent(lastName)}`,
+    );
+    const listed = found.find((client) => client.id === created.id);
+    expect(listed).toBeDefined();
+    expect(listed?.preferredContact).toBe('in_person');
+    expect(listed?.consentStatus).toBe('declined');
+
+    const { res: detailRes, body: detail } = await get<ClientDetail>(
+      app,
+      `/api/clients/${created.id}`,
+    );
+    expect(detailRes.statusCode).toBe(200);
+    expect(detail.client.preferredContact).toBe('in_person');
+    expect(detail.client.consentStatus).toBe('declined');
+  });
+
+  it('rejects an unsupported preferred contact and does not create a client', async () => {
+    const app = await makeApp();
+    const { body: before } = await get<Client[]>(app, '/api/clients');
+    const lastName = unique('BadContact');
+    const res = await post(app, '/api/clients', {
+      firstName: 'Ruth',
+      lastName,
+      phone: '555-0143',
+      preferredContact: 'carrier_pigeon',
+    });
+    expect(res.statusCode).toBe(400);
+    const body = json<ApiErrorResponse>(res);
+    expect(body.error.code.toUpperCase()).toBe('VALIDATION');
+    expect(body.error.message).toBeTruthy();
+    const details = body.error.details as
+      { issues?: Array<{ path: string; message: string }> } | undefined;
+    expect(details?.issues?.some((issue) => issue.path === 'preferredContact')).toBe(true);
+
+    const { body: found } = await get<Client[]>(
+      app,
+      `/api/clients?search=${encodeURIComponent(lastName)}`,
+    );
+    expect(found).toHaveLength(0);
+    const { body: after } = await get<Client[]>(app, '/api/clients');
+    expect(after).toHaveLength(before.length);
+  });
 });
 
 describe('POST /api/appointments', () => {
