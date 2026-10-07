@@ -72,11 +72,15 @@ your platform, Node's native build toolchain (Python 3, `make`, a C++ compiler) 
 | `npm run format:check`     | Prettier check over TS/JSON/MD/YAML/HTML (ignores `dist/`, `data/`, artifacts)           |
 | `npm run format`           | Prettier write                                                                           |
 | `npm run typecheck`        | `tsc --noEmit` for the app and for the server                                            |
-| `npm test`                 | Unit tests (`tests/unit`), Vitest                                                        |
-| `npm test -- --run`        | Same tests, explicit run mode                                                            |
+| `npm test`                 | Unit tests: domain rules (`tests/unit`) + pure client helpers (`src/client`), Vitest     |
+| `npm test -- --run`        | Same unit suites, explicit run mode                                                      |
 | `npm run test:integration` | API + SQLite integration tests (`tests/integration`)                                     |
 | `npm run test:e2e`         | Playwright browser tests; starts its own server (see below)                              |
 | `npm run db:reset`         | Deletes the SQLite file (`CAREGRID_DB_FILE` or the default) so the next start reseeds it |
+
+`npm test` (or `npm test -- --run` for an explicit run mode) runs both unit suites in one Vitest
+pass: the domain tests in `tests/unit` and the pure client helper tests under `src/client`.
+Integration tests remain separate in `npm run test:integration`.
 
 `npm run test:e2e` is self-contained: `playwright.config.ts` builds the app, wipes a disposable
 database under `data/e2e/`, starts the server on **port 4183** with `CAREGRID_TODAY=2026-10-07`,
@@ -119,7 +123,7 @@ playwright.config.ts        E2E: own deterministic server on 4183, disposable DB
 src/client/                 Lit 3 views, components and the typed API client
 src/server/                 Fastify app, routes, domain rules, SQLite store and seed
 src/shared/                 Types, constants and Zod schemas shared by client and server
-tests/unit/                 Vitest unit tests for the domain rules and client helpers
+tests/unit/                 Vitest domain-rule tests (`npm test` also runs src/client helper tests)
 tests/integration/          Vitest API/storage tests against a real Fastify instance + SQLite
 tests/e2e/                  Playwright browser journeys
 
