@@ -729,7 +729,10 @@ function insertSeedData(db: Database.Database): void {
   );
   for (const followUp of SEED_FOLLOW_UPS) {
     const clientName = clientNames.get(followUp.clientId) ?? followUp.clientId;
-    const assigneeName = followUp.assigneeId === null ? null : (providerNames.get(followUp.assigneeId) ?? followUp.assigneeId);
+    const assigneeName =
+      followUp.assigneeId === null
+        ? null
+        : (providerNames.get(followUp.assigneeId) ?? followUp.assigneeId);
     const { events, updatedAt } = buildFollowUpActivity(followUp, clientName, assigneeName);
     activities.push(...events);
     insertFollowUp.run({ ...followUp, updatedAt });
@@ -752,8 +755,7 @@ export function seedDatabase(db: Database.Database): void {
   initializeDatabase(db);
   const seed = db.transaction(() => {
     const marker = db.prepare('SELECT value FROM meta WHERE key = ?').get(SEED_KEY) as
-      | { value: string }
-      | undefined;
+      { value: string } | undefined;
     if (marker !== undefined) return;
     if (hasRows(db)) {
       writeSeedMarker(db);
