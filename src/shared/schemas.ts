@@ -2,7 +2,12 @@
  * Caregrid request and query schemas.
  *
  * These schemas validate JSON payloads at the API boundary: Fastify routes parse
- * with them and the Lit client can reuse them for pre-flight form checks.
+ * the query, status, import and list schemas directly, and the Lit client can
+ * reuse the create schemas for pre-flight form checks. The shipped routes stay
+ * authoritative for rejection (for example `POST /api/clients` additionally
+ * requires a reachable phone), so this module describes what the public API
+ * accepts without loosening the server's own route-local validation.
+ *
  * Conflict rules that need storage state (duplicate clients, capacity overflow,
  * invalid status transitions) deliberately live outside this module.
  */
@@ -132,13 +137,12 @@ export const booleanQuerySchema = z.preprocess((value) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Client fields shared by single-client creation and bulk import. Absent
- * contact details are normalized (`phone`/`preferredName`/`accessNotes` to `''`,
- * `email` to `null`) so downstream code never has to handle `undefined`.
+ * Client contact, consent and status fields shared by single-client creation
+ * and bulk import. Absent contact details are normalized (`phone`,
+ * `preferredName` and `accessNotes` to `''`, `email` to `null`) so downstream
+ * code never has to handle `undefined`.
  */
-const clientFields = {
-  firstName: requiredText(MAX_NAME_LENGTH, 'First name'),
-  lastName: requiredText(MAX_NAME_LENGTH, 'Last name'),
+const clientProfileFields = {
   preferredName: optionalText(MAX_NAME_LENGTH, 'Preferred name'),
   phone: optionalPhoneSchema,
   email: optionalEmailSchema,
@@ -147,10 +151,38 @@ const clientFields = {
   status: z.enum(CLIENT_STATUSES).default('active'),
 };
 
-export const createClientSchema = z.object({ ...clientFields });
+/**
+ * `POST /api/clients` payload. Accepts the canonical `firstName`/`lastName`
+ * pair or the legacy `fullName` compatibility form, plus optional contact,
+ * access, consent and status fields. `firstName` + `lastName` win over
+ * `fullName` at the route, and the route additionally requires a phone.
+ */
+export const createClientSchema = z
+  .object({
+    firstName: requiredText(MAX_NAME_LENGTH, 'First name').optional(),
+    lastName: requiredText(MAX_NAME_LENGTH, 'Last name').optional(),
+    fullName: optionalText(MAX_NAME_LENGTH, 'Full name'),
+    dateOfBirth: z.preprocess(emptyToUndefined, isoDateSchema.optional()),
+    notes: optionalText(MAX_ACCESS_NOTES_LENGTH, 'Notes'),
+    consentGranted: z.boolean().optional(),
+    ...clientProfileFields,
+  })
+  .refine(
+    (value) =>
+      value.firstName !== undefined || value.lastName !== undefined || value.fullName !== '',
+    { message: 'A first and last name or a full name is required', path: ['firstName'] },
+  );
 
-/** One client-like row inside a bulk import payload. */
-export const clientImportRowSchema = z.object({ ...clientFields });
+/**
+ * One client-like row inside a bulk import payload. Import rows always spell
+ * the name as `firstName`/`lastName`; the `fullName` compatibility form only
+ * exists on `POST /api/clients`.
+ */
+export const clientImportRowSchema = z.object({
+  firstName: requiredText(MAX_NAME_LENGTH, 'First name'),
+  lastName: requiredText(MAX_NAME_LENGTH, 'Last name'),
+  ...clientProfileFields,
+});
 
 /**
  * Bulk client import. Duplicate handling is a storage rule: `reject_duplicates`
@@ -171,6 +203,7 @@ export const clientImportSchema = z.object({
 /**
  * Appointment request payload. `sessionId` is intentionally absent: the server
  * resolves the clinic session from `date` and enforces capacity/conflicts.
+ * `type` defaults to `other`, while `reason` and `notes` are optional.
  */
 export const createAppointmentSchema = z
   .object({
@@ -179,8 +212,8 @@ export const createAppointmentSchema = z
     date: isoDateSchema,
     startTime: isoTimeSchema,
     endTime: isoTimeSchema,
-    type: z.enum(APPOINTMENT_TYPES),
-    reason: requiredText(MAX_REASON_LENGTH, 'Reason'),
+    type: z.enum(APPOINTMENT_TYPES).default('other'),
+    reason: optionalText(MAX_REASON_LENGTH, 'Reason'),
     notes: optionalText(MAX_NOTES_LENGTH, 'Notes'),
   })
   .refine((value) => value.endTime > value.startTime, {
@@ -209,14 +242,23 @@ export const appointmentListQuerySchema = z.object({
 // Follow-up create + status
 // ---------------------------------------------------------------------------
 
+/**
+ * Follow-up request payload (`POST /api/follow-ups`, alias `/api/followups`).
+ * `dueDate` intentionally carries no default here: the route resolves an
+ * absent due date to seven days after the server's current date. `assigneeId`
+ * (or an `assignee` id/name/email), `appointmentId`, `priority` and
+ * `notes`/`detail` are optional, with `priority` defaulting to `normal`.
+ */
 export const createFollowUpSchema = z.object({
   clientId: nonBlankIdSchema,
   appointmentId: z.preprocess(emptyToUndefined, nonBlankIdSchema.nullable().default(null)),
-  assigneeId: nonBlankIdSchema,
+  assigneeId: z.preprocess(emptyToUndefined, nonBlankIdSchema.nullable().default(null)),
+  assignee: optionalText(MAX_NAME_LENGTH, 'Assignee'),
   title: requiredText(MAX_TITLE_LENGTH, 'Title'),
-  dueDate: isoDateSchema,
+  dueDate: isoDateSchema.optional(),
   priority: z.enum(FOLLOW_UP_PRIORITIES).default('normal'),
   notes: optionalText(MAX_NOTES_LENGTH, 'Notes'),
+  detail: optionalText(MAX_NOTES_LENGTH, 'Detail'),
 });
 
 export const followUpStatusPatchSchema = z.object({
@@ -238,11 +280,12 @@ export const followUpListQuerySchema = z.object({
 // Remaining list queries
 // ---------------------------------------------------------------------------
 
-/** Client list filters; all optional and combinable. */
+/** Client list filters; all optional and combinable, `search` aliases `q`. */
 export const clientListQuerySchema = z.object({
   status: optionalEnum(CLIENT_STATUSES),
   consentStatus: optionalEnum(CLIENT_CONSENT_STATUSES),
   q: searchQuerySchema,
+  search: searchQuerySchema,
 });
 
 /** Clinic session list filters; all optional and combinable. */

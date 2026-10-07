@@ -8,6 +8,7 @@
  */
 import type {
   ActivityEntityType,
+  ApiErrorCode,
   AppointmentStatus,
   AppointmentType,
   ClientConsentStatus,
@@ -47,6 +48,11 @@ export interface Provider {
   /** Hex colour used by the client to tag this provider in schedule views. */
   color: string;
   active: boolean;
+  /** Contact and audit fields returned by `GET /api/providers`. */
+  email?: string;
+  phone?: string | null;
+  createdAt?: IsoDateTime;
+  updatedAt?: IsoDateTime;
 }
 
 export interface ClinicSession {
@@ -57,6 +63,18 @@ export interface ClinicSession {
   capacity: number;
   opensAt: IsoTime;
   closesAt: IsoTime;
+  /** Alias of `opensAt` returned by session reads. */
+  startTime?: IsoTime;
+  /** Alias of `closesAt` returned by session reads. */
+  endTime?: IsoTime;
+  /** Capacity summary counters returned alongside each session. */
+  booked?: number;
+  remaining?: number;
+  /** `booked / capacity` as a 0-1 fraction, rounded by the server. */
+  utilization?: number;
+  leadProviderId?: string | null;
+  leadProviderName?: string | null;
+  notes?: string | null;
 }
 
 export interface Client {
@@ -71,8 +89,12 @@ export interface Client {
   email: string | null;
   accessNotes: string;
   consentStatus: ClientConsentStatus;
+  /** `waitlist` is a first-class public status alongside active and archived. */
   status: ClientStatus;
   createdAt: IsoDateTime;
+  updatedAt?: IsoDateTime;
+  /** `null` when the clinic has no birth date on file. */
+  dateOfBirth?: IsoDate | null;
 }
 
 /**
@@ -97,6 +119,8 @@ export interface Appointment {
   clientName: string;
   providerName: string;
   location: string;
+  /** Always returned by list/detail reads; mirrors `date` for compatibility. */
+  sessionDate?: IsoDate;
 }
 
 export interface FollowUp {
@@ -104,7 +128,8 @@ export interface FollowUp {
   clientId: string;
   /** `null` when the follow-up is not tied to a specific appointment. */
   appointmentId: string | null;
-  assigneeId: string;
+  /** `null` when the follow-up is unassigned. */
+  assigneeId: string | null;
   title: string;
   dueDate: IsoDate;
   priority: FollowUpPriority;
@@ -114,6 +139,12 @@ export interface FollowUp {
   updatedAt: IsoDateTime;
   clientName: string;
   assigneeName: string;
+  /** Denormalized alias of `notes` returned by follow-up reads. */
+  detail?: string;
+  /** True when the server already classified the due date as overdue. */
+  overdue?: boolean;
+  /** Set when the follow-up reached `done`; `null` otherwise. */
+  completedAt?: IsoDateTime | null;
 }
 
 export interface ActivityEvent {
@@ -143,6 +174,20 @@ export interface DashboardMetrics {
   openFollowUps: number;
   overdueFollowUps: number;
   availableCapacityToday: number;
+  /** Alias of `appointmentsToday` returned by the dashboard payload. */
+  todayAppointments?: number;
+  /** Capacity counters for today's sessions. */
+  capacityTotal?: number;
+  capacityBooked?: number;
+  booked?: number;
+  capacity?: number;
+  remaining?: number;
+  /** `completedToday / capacityBooked` as a 0-1 fraction. */
+  completionRate?: number;
+  /** `completionRate` as a 0-100 percentage rounded to one decimal. */
+  completionPercent?: number;
+  /** Today's appointment counts per status. */
+  byStatus?: Partial<Record<AppointmentStatus, number>>;
 }
 
 /**
@@ -153,9 +198,13 @@ export interface DashboardMetrics {
  */
 export interface DashboardData {
   asOfDate: IsoDate;
+  /** Alias of `asOfDate` returned by the dashboard payload. */
+  today?: IsoDate;
   metrics: DashboardMetrics;
   upcomingAppointments: Appointment[];
   followUps: FollowUp[];
+  /** Overdue subset of `followUps`. */
+  overdueFollowUps?: FollowUp[];
   sessions: ClinicSession[];
 }
 
@@ -172,8 +221,8 @@ export interface ClientDetail {
 }
 
 export interface ApiErrorInfo {
-  /** Machine-readable code; see `ERROR_CODES` for the canonical set. */
-  code: string;
+  /** Machine-readable upper-case code; see `ERROR_CODES` for the canonical set. */
+  code: ApiErrorCode;
   /** Human-readable, safe to surface in the UI. */
   message: string;
   /** Optional structured context, e.g. Zod issues or conflicting ids. */
@@ -197,14 +246,15 @@ export interface ClientImportRowError {
 
 /**
  * Response contract for `POST /api/clients/import`. `mode` echoes the resolved
- * import mode, `errors` lists rows rejected by storage rules (for example
- * duplicates in `reject_duplicates` mode), and `skipped` counts rows the mode
- * deliberately left alone.
+ * import mode, `created` lists the clients the import inserted, `skipped`
+ * counts rows `skip_duplicates` left alone, and `errors` carries per-row
+ * rejections when the server reports them instead of aborting the request.
  */
 export interface ClientImportResult {
   mode: ClientImportMode;
   totalRows: number;
   imported: number;
+  created?: Client[];
   skipped: number;
   errors: ClientImportRowError[];
 }
